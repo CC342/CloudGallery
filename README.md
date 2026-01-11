@@ -73,6 +73,7 @@ RUN mkdir -p /app/cache && chmod 777 /app/cache
 CMD ["python", "app.py"]
 
 
+
 ### 4. 配置环境变量 (Settings)
 
 进入 Space 的 **Settings** -> **Variables and secrets**，添加以下变量：
@@ -102,14 +103,12 @@ CMD ["python", "app.py"]
 ```bash
 git clone [https://github.com/yourusername/CloudGallery.git](https://github.com/yourusername/CloudGallery.git)
 cd CloudGallery
-
 ```
 
 
 2. **安装依赖**
 ```bash
 pip install flask flask-cors huggingface_hub werkzeug
-
 ```
 
 
@@ -119,7 +118,6 @@ export HF_TOKEN="你的token"
 export DATASET_NAME="你的用户名/数据集名"
 export ADMIN_USER="admin"
 export ADMIN_PASS="123456"
-
 ```
 
 
@@ -127,7 +125,6 @@ export ADMIN_PASS="123456"
 4. **运行**
 ```bash
 python app.py
-
 ```
 
 
@@ -145,7 +142,6 @@ flask-cors
 huggingface_hub
 werkzeug
 gunicorn
-
 ```
 
 ---
@@ -158,7 +154,6 @@ gunicorn
 
 本项目基于 [MIT License](https://www.google.com/search?q=LICENSE) 开源。
 
-```
 
 ---
 
@@ -173,7 +168,6 @@ CloudGallery/
 ├── requirements.txt    # 依赖包列表
 ├── README.md           # 上面的文档
 └── .gitignore          # 忽略文件
-
 ```
 
 **`.gitignore` 文件建议内容**（防止你不小心把缓存文件传上去）：
@@ -183,7 +177,5 @@ __pycache__/
 *.pyc
 /cache
 .env
-
 ```
 
-**需要我帮你把 `Dockerfile` 和 `requirements.txt` 的具体内容也单独列出来吗？方便你直接复制创建文件。**
