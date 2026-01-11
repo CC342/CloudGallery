@@ -2,8 +2,9 @@ import os
 import time
 import uuid
 import datetime
+import requests
 from functools import wraps
-from flask import Flask, request, jsonify, render_template_string, redirect, session, url_for
+from flask import Flask, request, jsonify, render_template_string, redirect, session, url_for, Response
 from flask_cors import CORS
 from huggingface_hub import HfApi, CommitOperationDelete
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -202,14 +203,14 @@ HTML_TEMPLATE = """
             {% for img in images %}
             <div class="card" id="card-{{ loop.index0 }}">
                 <div class="img-container" onclick="openViewer({{ loop.index0 }})">
-                    <img src="{{ img.real_url }}" loading="lazy" onload="updateRes(this)">
+                    <img src="{{ img.raw_url }}" loading="lazy" onload="updateRes(this)">
                 </div>
                 <button class="delete-btn" onclick="deleteImage('{{ img.name }}', {{ loop.index0 }})">×</button>
                 <div class="card-body">
                     <div class="file-name" title="{{ img.name }}">{{ img.name }}</div>
                     <div class="meta-info"><span>{{ img.size_fmt }}</span><span class="res-tag">...</span></div>
-                    <button class="copy-btn primary" onclick="copyLink(this, '{{ img.view_url }}')">📋 复制链接</button>
-                    <button class="copy-btn" onclick="copyMarkdown(this, '{{ img.name }}', '{{ img.real_url }}')">📝 复制 Markdown</button>
+                    <button class="copy-btn primary" onclick="copyLink(this, '{{ img.raw_url }}')">📋 复制链接</button>
+                    <button class="copy-btn" onclick="copyMarkdown(this, '{{ img.name }}', '{{ img.raw_url }}')">📝 复制 Markdown</button>
                 </div>
             </div>
             {% endfor %}
@@ -241,7 +242,7 @@ HTML_TEMPLATE = """
     <script>
         const galleryData = [
             {% for img in images %}
-            { name: "{{img.name}}", url: "{{img.real_url}}", view_url: "{{img.view_url}}" },
+            { name: "{{img.name}}", url: "{{img.raw_url}}", view_url: "{{img.view_url}}" },
             {% endfor %}
         ];
         let curIdx = 0, scale = 1;
@@ -333,8 +334,10 @@ def home():
         images = []
         for item in tree:
             if item.path.lower().endswith(('.png','.jpg','.jpeg','.gif','.webp','.bmp')):
+                raw_url = f"{BASE_URL}/file/{item.path}"
                 images.append({
                     "name": item.path,
+                    "raw_url": raw_url,
                     "real_url": f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/{item.path}",
                     "view_url": f"{BASE_URL}/view/{item.path}",
                     "size_fmt": format_size(item.size) if hasattr(item, 'size') else "?"
@@ -376,5 +379,12 @@ def delete_file():
 @app.route('/view/<path:filename>')
 def view_image(filename):
     return render_template_string(VIEW_TEMPLATE, real_url=f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/{filename}")
+
+@app.route('/file/<path:filename>')
+def get_image_file(filename):
+    url = f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/{filename}"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    r = requests.get(url, headers=headers, stream=True)
+    return Response(r.iter_content(chunk_size=1024), content_type=r.headers.get('Content-Type'))
 
 if __name__ == '__main__': app.run(host='0.0.0.0', port=7860)
