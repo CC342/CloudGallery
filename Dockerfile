@@ -13,7 +13,8 @@ RUN pip install --no-cache-dir \
     flask \
     flask-cors \
     huggingface_hub \
-    gunicorn
+    gunicorn \
+    requests
 
 # 2. 复制当前目录的所有文件到容器
 COPY . .
