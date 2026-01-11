@@ -57,20 +57,20 @@
 3.  **Template** 选择 **Blank**。
 
 ### 3. 上传代码
-将本项目中的 `app.py` 和 `Dockerfile` 上传到 Space 的 Files 中。
+将本项目中的 `main.py` 和 `Dockerfile` 上传到 Space 的 Files 中。
 
 **Dockerfile 内容示例：**
 ```dockerfile
 FROM python:3.9-slim
-WORKDIR /app
+WORKDIR /cloudgallery
 # 安装依赖
 RUN pip install --no-cache-dir flask flask-cors huggingface_hub gunicorn
 # 复制所有文件
 COPY . .
 # 创建缓存目录
-RUN mkdir -p /app/cache && chmod 777 /app/cache
+RUN mkdir -p /cloudgallery/cache && chmod 777 /cloudgallery/cache
 # 启动
-CMD ["python", "app.py"]
+CMD ["python", "main.py"]
 ```
 
 ### 4. 配置环境变量 (Settings)
@@ -84,13 +84,11 @@ CMD ["python", "app.py"]
 | **Secret** | `ADMIN_PASS` | 后台登录密码 | `password123` |
 | **Variable** | `DATASET_NAME` | 你的数据集名称 (格式: 用户名/数据集名) | `username/my-images` |
 
-*(可选)* `app.py` 代码中默认生成了固定的 `SECRET_KEY`。为了更安全，你可以手动修改代码中的 `app.secret_key`。
+*(可选)* `main.py` 代码中默认生成了固定的 `SECRET_KEY`。为了更安全，你可以手动修改代码中的 `app.secret_key`。
 
 ### 5. 重启并使用
 
 配置完成后，Space 会自动重建。等待上方变成 **Running** (绿色)，即可点击 App 进行访问。
-
-> **注意**：由于浏览器对 iframe 的 Cookie 限制，如果在 Space 小窗口登录失败，请点击右上角的 **"Open in new tab"** 在新标签页打开使用。
 
 ---
 
@@ -100,7 +98,7 @@ CMD ["python", "app.py"]
 
 1. **克隆仓库**
 ```bash
-git clone [https://github.com/yourusername/CloudGallery.git](https://github.com/yourusername/CloudGallery.git)
+git clone [https://github.com/CC342/CloudGallery.git](https://github.com/CC342/CloudGallery.git)
 cd CloudGallery
 ```
 
