@@ -71,8 +71,7 @@ COPY . .
 RUN mkdir -p /app/cache && chmod 777 /app/cache
 # 启动
 CMD ["python", "app.py"]
-
-
+```
 
 ### 4. 配置环境变量 (Settings)
 
