@@ -3,3 +3,4 @@ flask-cors
 huggingface_hub
 werkzeug
 gunicorn
+requests
