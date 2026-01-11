@@ -92,56 +92,6 @@ CMD ["python", "main.py"]
 
 ---
 
-## 💻 本地运行
-
-如果你想在本地电脑开发或运行：
-
-1. **克隆仓库**
-```bash
-git clone [https://github.com/CC342/CloudGallery.git](https://github.com/CC342/CloudGallery.git)
-cd CloudGallery
-```
-
-
-2. **安装依赖**
-```bash
-pip install flask flask-cors huggingface_hub werkzeug
-```
-
-
-3. **设置环境变量** (Linux/Mac)
-```bash
-export HF_TOKEN="你的token"
-export DATASET_NAME="你的用户名/数据集名"
-export ADMIN_USER="admin"
-export ADMIN_PASS="123456"
-```
-
-
-*(Windows Powershell 使用 `$env:HF_TOKEN="..."`)*
-4. **运行**
-```bash
-python app.py
-```
-
-
-访问 `http://127.0.0.1:7860`。
-
----
-
-## 📝 依赖列表 (requirements.txt)
-
-如果你使用 pip 安装，建议创建 `requirements.txt`：
-
-```txt
-flask
-flask-cors
-huggingface_hub
-werkzeug
-gunicorn
-```
-
----
 
 ## 🤝 贡献
 
@@ -150,29 +100,3 @@ gunicorn
 ## 📄 开源协议
 
 本项目基于 [MIT License](https://www.google.com/search?q=LICENSE) 开源。
-
-
----
-
-### 💡 补充建议
-
-既然你要发布到 GitHub，建议你的项目文件夹结构如下：
-
-```text
-CloudGallery/
-├── app.py              # 我们刚才写的完整代码
-├── Dockerfile          # 上面提供的 Dockerfile 内容
-├── requirements.txt    # 依赖包列表
-├── README.md           # 上面的文档
-└── .gitignore          # 忽略文件
-```
-
-**`.gitignore` 文件建议内容**（防止你不小心把缓存文件传上去）：
-
-```gitignore
-__pycache__/
-*.pyc
-/cache
-.env
-```
-
