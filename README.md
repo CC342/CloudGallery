@@ -33,7 +33,7 @@
 
 ## 📸 界面预览
 
-![登入界面](https://huggingface.co/datasets/cody89/imagehost/resolve/main/b5dc.png)
+![b5dc.png](https://huggingface.co/datasets/cody89/imagehost/resolve/main/b5dc.png)
 
 ![主界面](https://cody89-imagehost.hf.space/view/0e53.png)
 
