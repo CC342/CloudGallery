@@ -68,7 +68,7 @@
 FROM python:3.9-slim
 WORKDIR /cloudgallery
 # 安装依赖
-RUN pip install --no-cache-dir flask flask-cors huggingface_hub gunicorn
+RUN pip install --no-cache-dir flask flask-cors huggingface_hub gunicorn requests
 # 复制所有文件
 COPY . .
 # 创建缓存目录
