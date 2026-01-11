@@ -1,4 +1,3 @@
-```markdown
 # ☁️ CloudGallery (云图床)
 
 > 基于 Hugging Face Datasets 的无限容量、高颜值、私有化图床系统。
@@ -73,7 +72,6 @@ RUN mkdir -p /app/cache && chmod 777 /app/cache
 # 启动
 CMD ["python", "app.py"]
 
-```
 
 ### 4. 配置环境变量 (Settings)
 
