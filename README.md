@@ -33,11 +33,11 @@
 
 ## 📸 界面预览
 
-![b5dc.png](https://huggingface.co/datasets/cody89/imagehost/resolve/main/b5dc.png)
+![登入页面](https://cody89-imagehost.hf.space/file/b5dc.png)
 
-![主界面](https://cody89-imagehost.hf.space/view/0e53.png)
+![主界面](https://cody89-imagehost.hf.space/file/0e53.png)
 
-![预览页面](https://cody89-imagehost.hf.space/view/3306.png)
+![预览页面](https://cody89-imagehost.hf.space/file/3306.png)
 
 ---
 
