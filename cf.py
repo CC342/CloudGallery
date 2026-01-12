@@ -11,7 +11,6 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 CORS(app)
-# 彻底移除 ProxyFix，避免干扰
 # app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 app.secret_key = "my-fixed-secret-key-2026"
@@ -29,17 +28,18 @@ ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 
 # ==========================================
-# 👇 核心修复逻辑：智能处理自定义域名
+# 👇 关键修复：智能处理自定义域名格式
 # ==========================================
 CUSTOM_DOMAIN = os.environ.get("CUSTOM_DOMAIN")
 if CUSTOM_DOMAIN:
     # 1. 去除结尾的斜杠
     if CUSTOM_DOMAIN.endswith("/"):
         CUSTOM_DOMAIN = CUSTOM_DOMAIN[:-1]
-    # 2. 自动补全 https:// (修复域名重复问题)
+    
+    # 2. 👇 漏掉的就是这几行：如果没有 https://，自动加上
+    # 这样 Flask 就知道这是个绝对网址，不会把它当成相对路径去拼接了
     if not CUSTOM_DOMAIN.startswith("http"):
         CUSTOM_DOMAIN = f"https://{CUSTOM_DOMAIN}"
-
 # ==========================================
 
 if HF_TOKEN: api = HfApi(token=HF_TOKEN)
@@ -57,7 +57,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if ADMIN_USER and ADMIN_PASS and not session.get('logged_in'):
-            # 未登录时，强制跳转到自定义域名登录
+            # 未登录跳转逻辑
             if CUSTOM_DOMAIN:
                 return redirect(f"{CUSTOM_DOMAIN}/login")
             return redirect(url_for('login'))
@@ -67,7 +67,7 @@ def login_required(f):
 # 1. 登录页面
 LOGIN_TEMPLATE = """<!DOCTYPE html><html><head><title>登录</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;height:100vh;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;background:url('https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;background-size:cover}.glass-box{width:300px;padding:40px 30px;text-align:center;background:rgba(255,255,255,0.1);backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);border-radius:24px;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 32px 0 rgba(0,0,0,0.1);color:white}h2{margin:0 0 25px 0;font-weight:500}input{width:100%;padding:14px;margin:10px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;outline:none;transition:0.3s;box-sizing:border-box}input:focus{background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.8)}button{width:100%;padding:14px;margin-top:20px;background:rgba(255,255,255,0.9);color:#333;border:none;border-radius:12px;font-weight:bold;cursor:pointer;transition:0.3s}button:hover{background:white;transform:translateY(-2px)}.err{color:#ffcccc;background:rgba(255,0,0,0.2);padding:5px;border-radius:5px;font-size:14px;margin-bottom:10px}</style></head><body><div class="glass-box"><h2>CloudGallery</h2>{% if error %}<div class="err">{{ error }}</div>{% endif %}<form method="post"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button type="submit">Sign In</button></form></div></body></html>"""
 
-# 2. 全屏查看 (备用)
+# 2. 全屏查看
 VIEW_TEMPLATE = """<!DOCTYPE html><html><head><title>查看</title><style>body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden}img{width:100%;height:100%;object-fit:contain}</style></head><body><img src="{{ real_url }}"></body></html>"""
 
 # 3. 主页模板
@@ -77,7 +77,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的图床</title>
+    <title>CloudGallery</title>
     <style>
         * { box-sizing: border-box; }
         :root { --primary: #3b82f6; --bg: #f8fafc; }
@@ -256,7 +256,6 @@ def login():
         if request.form.get('username') == ADMIN_USER and request.form.get('password') == ADMIN_PASS:
             session.permanent = True; session['logged_in'] = True; 
             
-            # 👇 修复：登录成功后，优先使用自定义域名跳转
             if CUSTOM_DOMAIN:
                 return redirect(f"{CUSTOM_DOMAIN}/")
             return redirect("/")
@@ -267,8 +266,6 @@ def login():
 @app.route('/logout')
 def logout(): 
     session.pop('logged_in', None); 
-    
-    # 👇 修复：登出后，优先使用自定义域名跳回登录页
     if CUSTOM_DOMAIN:
         return redirect(f"{CUSTOM_DOMAIN}/login")
     return redirect('/login')
@@ -281,20 +278,21 @@ def home():
         tree = api.list_repo_tree(repo_id=DATASET_NAME, repo_type="dataset", token=HF_TOKEN, recursive=False)
         images = []
         
-        # 👇 修复：决定当前使用的链接前缀
         current_host = CUSTOM_DOMAIN if CUSTOM_DOMAIN else BASE_URL
 
         for item in tree:
             if item.path.lower().endswith(('.png','.jpg','.jpeg','.gif','.webp','.bmp')):
                 
-                # 👇 使用 current_host (绝对路径)
                 raw_url = f"{current_host}/file/{item.path}"
+                
+                # view_url 也走代理
+                view_url = f"{current_host}/view/{item.path}"
                 
                 images.append({
                     "name": item.path,
                     "raw_url": raw_url,
                     "real_url": f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/{item.path}",
-                    "view_url": f"{BASE_URL}/view/{item.path}",
+                    "view_url": view_url,
                     "size_fmt": format_size(item.size) if hasattr(item, 'size') else "?"
                 })
         images.reverse()
@@ -331,13 +329,25 @@ def delete_file():
 
 @app.route('/view/<path:filename>')
 def view_image(filename):
-    return render_template_string(VIEW_TEMPLATE, real_url=f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/{filename}")
+    current_host = CUSTOM_DOMAIN if CUSTOM_DOMAIN else BASE_URL
+    real_url = f"{current_host}/file/{filename}"
+    return render_template_string(VIEW_TEMPLATE, real_url=real_url)
 
 @app.route('/file/<path:filename>')
 def get_image_file(filename):
-    url = f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/{filename}"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    r = requests.get(url, headers=headers, stream=True)
-    return Response(r.iter_content(chunk_size=1024), content_type=r.headers.get('Content-Type'))
+    try:
+        url = f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/{filename}"
+        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        r = requests.get(url, headers=headers, stream=True)
+        if r.status_code != 200: return f"Error: {r.status_code}", r.status_code
+        
+        # 构造响应流
+        response = Response(stream_with_context(r.iter_content(chunk_size=1024)), content_type=r.headers.get('Content-Type'))
+        
+        # 🔥 缓存设置
+        response.headers['Cache-Control'] = 'public, max-age=31536000'
+        
+        return response
+    except Exception as e: return f"Proxy Error: {str(e)}", 500
 
 if __name__ == '__main__': app.run(host='0.0.0.0', port=7860)
