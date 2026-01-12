@@ -96,6 +96,59 @@ CMD ["python", "main.py"]
 
 ---
 
+没问题，这是单独的 **Cloudflare Worker 国内加速** 部分，你可以直接复制粘贴到你的文档或笔记中：
+
+---
+
+## ⚡ 进阶：国内访问加速 (Cloudflare Worker)
+
+由于 Hugging Face 官方域名 (`hf.space`) 在国内访问不稳定或被阻断，推荐使用 **Cloudflare Worker** 进行反向代理，实现国内直连访问和高速加载。
+
+### 1. 创建 Worker
+
+1. 登录 [Cloudflare](https://www.cloudflare.com/)，进入左侧 **Workers & Pages**。
+2. 点击 **Create Application** -> **Create Worker** -> **Deploy**。
+3. 点击 **Edit code**，清空原有代码，粘贴以下内容：
+
+```javascript
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    
+    // ⚠️ 修改这里：填入你 Space 的真实直连地址 (不要带 https://)
+    const targetHost = "你的用户名-项目名.hf.space"; 
+    
+    url.hostname = targetHost;
+    url.protocol = "https:";
+
+    // 构造请求
+    const newRequest = new Request(url.toString(), {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+      redirect: "manual" 
+    });
+
+    return fetch(newRequest);
+  },
+};
+
+```
+
+4. 点击右上角 **Deploy** 保存。你将获得一个 `xxx.workers.dev` 的访问地址。
+* *(可选推荐)*：在 Worker 的 **Settings -> Triggers** 中绑定你自己的自定义域名 (如 `img.yourdomain.com`)，访问更稳定。
+
+
+
+### 2. 配置 Space 适配反代域名
+
+回到 Hugging Face Space 的 **Settings** -> **Variables and secrets**，新增一个变量：
+
+| 类型 | 变量名 | 描述 | 示例值 |
+| --- | --- | --- | --- |
+| **Variable** | `CUSTOM_DOMAIN` | 你的 Worker 地址或绑定的自定义域名 (必须带 https，不带结尾斜杠) | `https://img.yourdomain.com` |
+
+**作用**：设置此变量后，系统会自动优化登录跳转逻辑，且主页生成的“复制链接”会自动替换为你的加速域名。
 
 ## 🤝 贡献
 
