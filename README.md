@@ -96,9 +96,7 @@ CMD ["python", "main.py"]
 
 ---
 
-没问题，这是单独的 **Cloudflare Worker 国内加速** 部分，你可以直接复制粘贴到你的文档或笔记中：
 
----
 
 ## ⚡ 进阶：国内访问加速 (Cloudflare Worker)
 
