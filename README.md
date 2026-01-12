@@ -2,7 +2,7 @@
 
 > 基于 Hugging Face Datasets 的无限容量、高颜值、私有化图床系统。
 
-[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces)
+[![Hugging Face Spaces](https://wsrv.nl/?url=https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces)
 [![Python](https://img.shields.io/badge/Python-Flask-green)](https://flask.palletsprojects.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
