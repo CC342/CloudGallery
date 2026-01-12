@@ -95,14 +95,29 @@ CMD ["python", "main.py"]
 配置完成后，Space 会自动重建。等待上方变成 **Running** (绿色)，即可点击 App 进行访问。
 
 ---
+好的，这种逻辑更顺畅。我们在进入“进阶教程”的一开始，就明确告诉用户需要使用 `cf.py` 这个特定的版本，这样操作流程就是连贯的。
 
+以下是修改后的 **“⚡ 进阶：国内访问加速 (Cloudflare Worker)”** 完整章节。你可以直接用这段替换原来的同名章节。
 
+---
 
 ## ⚡ 进阶：国内访问加速 (Cloudflare Worker)
 
-由于 Hugging Face 官方域名 (`hf.space`) 在国内访问不稳定或被阻断，推荐使用 **Cloudflare Worker** 进行反向代理，实现国内直连访问和高速加载。
+由于 Hugging Face 官方域名 (`hf.space`) 在国内访问不稳定或被阻断，推荐使用 **Cloudflare Worker** 进行反向代理。
 
-### 1. 创建 Worker
+**⚠️ 注意：** 为了支持反向代理和自定义域名，**请务必使用本项目中的 `cf.py` 文件**。
+
+### 1. 部署代码选择
+
+本项目提供了两个版本的核心代码：
+
+* **`app.py` (标准版)**：适合海外环境，逻辑纯净，默认生成官方直链。
+* **`cf.py` (国内加速版)**：**国内用户请用这个！** 它增加了 `CUSTOM_DOMAIN` 支持，修复了反代环境下的登录跳转和链接生成问题。
+
+**食用方法：**
+在将代码上传到 Hugging Face Space 时，请**直接复制 `cf.py` 的内容覆盖到 `app.py**`（或者修改 `Dockerfile` 的启动命令为 `CMD ["python", "cf.py"]`）。
+
+### 2. 创建 Cloudflare Worker
 
 1. 登录 [Cloudflare](https://www.cloudflare.com/)，进入左侧 **Workers & Pages**。
 2. 点击 **Create Application** -> **Create Worker** -> **Deploy**。
@@ -114,6 +129,7 @@ export default {
     const url = new URL(request.url);
     
     // ⚠️ 修改这里：填入你 Space 的真实直连地址 (不要带 https://)
+    // 可以在 Space 页面上方查看，格式通常为：用户名-项目名.hf.space
     const targetHost = "你的用户名-项目名.hf.space"; 
     
     url.hostname = targetHost;
@@ -124,13 +140,14 @@ export default {
       method: request.method,
       headers: request.headers,
       body: request.body,
+      // 🔥 关键配置：禁止 Worker 自动跟随重定向
+      // 解决登录后跳转路径错误或 405 Method Not Allowed 问题
       redirect: "manual" 
     });
 
     return fetch(newRequest);
   },
 };
-
 ```
 
 4. 点击右上角 **Deploy** 保存。你将获得一个 `xxx.workers.dev` 的访问地址。
@@ -138,7 +155,7 @@ export default {
 
 
 
-### 2. 配置 Space 适配反代域名
+### 3. 配置 Space 适配反代域名
 
 回到 Hugging Face Space 的 **Settings** -> **Variables and secrets**，新增一个变量：
 
@@ -146,7 +163,8 @@ export default {
 | --- | --- | --- | --- |
 | **Variable** | `CUSTOM_DOMAIN` | 你的 Worker 地址或绑定的自定义域名 (必须带 https，不带结尾斜杠) | `https://img.yourdomain.com` |
 
-**作用**：设置此变量后，系统会自动优化登录跳转逻辑，且主页生成的“复制链接”会自动替换为你的加速域名。
+**作用**：`cf.py` 读取到此变量后，会自动修正登录跳转路径，并将主页生成的“复制链接”替换为你的加速域名，确保国内可访问。
+
 
 ## 🤝 贡献
 
