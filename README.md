@@ -110,7 +110,7 @@ CMD ["python", "main.py"]
 * **`cf.py` (国内加速版)**：**国内用户请用这个！** 它增加了 `CUSTOM_DOMAIN` 支持，修复了反代环境下的登录跳转和链接生成问题。
 
 **食用方法：**
-在将代码上传到 Hugging Face Space 时，请**直接复制 `cf.py` 的内容覆盖到 `app.py`**（或者修改 `Dockerfile` 的启动命令为 `CMD ["python", "cf.py"]`）。
+在将代码上传到 Hugging Face Space 时，请**直接复制 `main.py` 的内容覆盖到 `app.py`**（或者修改 `Dockerfile` 的启动命令为 `CMD ["python", "cf.py"]`）。
 
 ### 2. 创建 Cloudflare Worker
 
