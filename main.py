@@ -290,6 +290,8 @@ def home():
 def upload_file():
     files = request.files.getlist('files')
     count = 0
+    print(f"DEBUG: Starting upload...")
+    print(f"DEBUG: Repo: {GITHUB_REPO}, Branch: {GITHUB_BRANCH}")
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     for file in files:
         if not file.filename: continue
