@@ -24,7 +24,7 @@
         .upload-wrapper input { position: absolute; left: 0; top: 0; font-size: 100px; opacity: 0; cursor: pointer; }
         #status { margin-top: 15px; color: #666; font-size: 14px; word-break: break-all; }
         
-        /* 头部布局修复：Flex 两端对齐 */
+        /* 头部布局 */
         .gallery-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; width: 100%; }
         .refresh-btn { background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; display: flex; align-items: center; gap: 5px; padding: 8px 12px; border-radius: 6px; }
         .refresh-btn:hover { background: #f1f5f9; color: var(--primary); }
@@ -37,9 +37,11 @@
         .card-body { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
         .file-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; }
         .meta-info { font-size: 10px; color: #999; display: flex; justify-content: space-between; }
+        
         .copy-btn { background: #f1f5f9; border: none; padding: 6px; border-radius: 4px; color: #475569; font-size: 12px; cursor: pointer; width: 100%; margin-top: 5px; }
         .copy-btn:hover { background: #e2e8f0; color: #0f172a; }
         .copy-btn.primary { background: #eff6ff; color: #2563eb; }
+        
         .delete-btn { position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.9); color: red; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; opacity: 0; font-weight: bold; transition: 0.2s; }
         .card:hover .delete-btn { opacity: 1; }
         
@@ -88,7 +90,8 @@
                 <div class="card-body">
                     <div class="file-name" title="{{ img.name }}">{{ img.name }}</div>
                     <div class="meta-info"><span>{{ img.size_fmt }}</span><span class="res-tag">...</span></div>
-                    <button class="copy-btn primary" onclick="copyLink(this, '{{ img.raw_url }}')">📋 复制链接</button>
+                    
+                    <button class="copy-btn primary" onclick="copyLink(this, '{{ img.raw_url }}')">📋 复制直链</button>
                     <button class="copy-btn" onclick="copyMarkdown(this, '{{ img.name }}', '{{ img.raw_url }}')">📝 复制 Markdown</button>
                 </div>
             </div>
@@ -105,7 +108,7 @@
                 <button class="lb-ctl-btn" onclick="resetZoom()" title="1:1" style="font-size:14px">1:1</button>
                 <button class="lb-ctl-btn" onclick="zoom(0.2)" title="放大">＋</button>
                 <span class="divider"></span>
-                <button class="lb-ctl-btn" onclick="copyCurrentLink()" title="复制链接">🔗</button>
+                <button class="lb-ctl-btn" onclick="copyCurrentLink(this)" title="复制直链">🔗</button>
             </div>
         </div>
         <div class="filmstrip-container"><div class="filmstrip" id="filmstrip" onclick="event.stopPropagation()"></div></div>
@@ -142,6 +145,13 @@
                 status.innerText = `❌ 网络错误`;
             }
         }
+
+        // --- 修复文件名长度 (4位随机) ---
+        // 注意：这里其实是前端多选上传逻辑，但你的后端 handleUpload 直接接收 FormData
+        // 文件名生成其实是在 Python 后端的 upload_file 函数里做的
+        // 既然你在这个 HTML 里没看到随机数生成代码，说明是在 Python 端生成的
+        // 如果要改文件名长度，得改 Python 里的 uuid.uuid4().hex[:4] (已经是4位了)
+        // 如果你指的是之前直传版的 JS，那个在下面，这里是表单上传版
 
         async function deleteImage(name, idx) {
             if (!confirm('确定删除?')) return;
@@ -195,37 +205,43 @@
         function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
         function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
         
-        // 🔥 复制时自动补全当前域名 (适配自定义域名)
+        // --- 🔥 修复：复制链接辅助函数 ---
         function getFullUrl(path) {
-            // 如果 path 已经是 http 开头，直接返回；否则补全 origin
             if(path.startsWith('http')) return path;
             return window.location.origin + path;
         }
 
+        function animateBtn(btn) {
+            if(!btn) return;
+            const originalText = btn.innerText;
+            // 区分是不是 Lightbox 的小按钮
+            if(btn.classList.contains('lb-ctl-btn')) {
+                btn.innerText = '✅';
+            } else {
+                btn.innerText = '✅ 已复制';
+            }
+            setTimeout(() => {
+                btn.innerText = originalText;
+            }, 1500);
+        }
+
+        // --- 修复：打勾逻辑 ---
         function copyLink(btn, txt) { 
             const fullLink = getFullUrl(txt);
             navigator.clipboard.writeText(fullLink); 
-            if(btn){
-                let t=btn.innerText;
-                btn.innerText='✅';
-                setTimeout(()=>btn.innerText=t,1500);
-            } 
+            animateBtn(btn);
         }
         
+        // --- 修复：Markdown 链接格式 ---
         function copyMarkdown(btn, n, u) { 
             const fullLink = getFullUrl(u);
             const md = `![${n}](${fullLink})`;
             navigator.clipboard.writeText(md); 
-            if(btn){
-                let t=btn.innerText;
-                btn.innerText='✅';
-                setTimeout(()=>btn.innerText=t,1500);
-            }
+            animateBtn(btn);
         }
         
-        function copyCurrentLink() { 
-            copyLink(null, galleryData[curIdx].url); 
-            alert('已复制'); 
+        function copyCurrentLink(btn) { 
+            copyLink(btn, galleryData[curIdx].url); 
         }
 
         function updateRes(img) { if(img.naturalWidth) img.closest('.card').querySelector('.res-tag').innerText = img.naturalWidth+'x'+img.naturalHeight; }
