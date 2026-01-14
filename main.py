@@ -8,7 +8,7 @@ from functools import wraps
 from flask import Flask, request, jsonify, render_template_string, redirect, session, url_for
 from flask_cors import CORS
 
-# 1. 彻底移除了 ProxyFix，防止 Vercel 报错 500
+# 1. 初始化 Flask (已移除 ProxyFix)
 app = Flask(__name__)
 CORS(app)
 
@@ -20,13 +20,12 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30)
 )
 
-# 2. 从 Vercel 环境变量读取
+# 2. 环境变量读取
 ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")
-# 默认分支设为你现在的 vercel，防呆设计
-GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "vercel") 
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main") # 默认main
 
 GITHUB_API_BASE = f"https://api.github.com/repos/{GITHUB_REPO}/contents"
 CDN_BASE = f"https://cdn.jsdelivr.net/gh/{GITHUB_REPO}@{GITHUB_BRANCH}"
@@ -47,7 +46,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# ================= UI 模板 =================
+# ================= UI 模板 (请确保完整复制这部分) =================
 LOGIN_TEMPLATE = """<!DOCTYPE html><html><head><title>登录</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;height:100vh;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;background:url('https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;background-size:cover}.glass-box{width:300px;padding:40px 30px;text-align:center;background:rgba(255,255,255,0.1);backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);border-radius:24px;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 32px 0 rgba(0,0,0,0.1);color:white}h2{margin:0 0 25px 0;font-weight:500}input{width:100%;padding:14px;margin:10px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;outline:none;transition:0.3s;box-sizing:border-box}input:focus{background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.8)}button{width:100%;padding:14px;margin-top:20px;background:rgba(255,255,255,0.9);color:#333;border:none;border-radius:12px;font-weight:bold;cursor:pointer;transition:0.3s}button:hover{background:white;transform:translateY(-2px)}.err{color:#ffcccc;background:rgba(255,0,0,0.2);padding:5px;border-radius:5px;font-size:14px;margin-bottom:10px}</style></head><body><div class="glass-box"><h2>CloudGallery</h2>{% if error %}<div class="err">{{ error }}</div>{% endif %}<form method="post"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button type="submit">Sign In</button></form></div></body></html>"""
 
 VIEW_TEMPLATE = """<!DOCTYPE html><html><head><title>查看</title><style>body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden}img{width:100%;height:100%;object-fit:contain}</style></head><body><img src="{{ real_url }}"></body></html>"""
@@ -58,7 +57,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CloudGallery (GitHub版)</title>
+    <title>CloudGallery</title>
     <style>
         * { box-sizing: border-box; }
         :root { --primary: #3b82f6; --bg: #f8fafc; }
@@ -337,7 +336,6 @@ def upload_file():
         if not ext: ext = ".jpg"
         name = f"{uuid.uuid4().hex[:4]}{ext}"
         try:
-            # 读取并上传
             file_content = base64.b64encode(file.read()).decode('utf-8')
             data = {"message": f"Up {name}", "content": file_content, "branch": GITHUB_BRANCH}
             r = requests.put(f"{GITHUB_API_BASE}/{name}", json=data, headers=headers)
