@@ -24,12 +24,12 @@ ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")
-GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main") 
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH") 
 
 # 这里的逻辑已经修正，确保分支名正确
 GITHUB_API_BASE = f"https://api.github.com/repos/{GITHUB_REPO}/contents"
 # CDN 链接拼接
-CDN_BASE = f"https://cdn.jsdelivr.net/gh/{GITHUB_REPO}@{GITHUB_BRANCH}"
+CDN_BASE = f"https://cdn.jsdelivr.net/gh/{GITHUB_REPO}"
 CACHE_DIR = tempfile.gettempdir()
 
 def format_size(size):
