@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudGallery</title>
+    <style>
+        :root { --primary: #3b82f6; --bg: #f8fafc; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .upload-section { background: white; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .btn { background: white; border: 2px solid var(--primary); color: var(--primary); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn:hover { background: var(--primary); color: white; }
+        #fileInput { display: none; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); position: relative; }
+        .card img { width: 100%; height: 150px; object-fit: cover; cursor: pointer; }
+        .info { padding: 10px; font-size: 12px; }
+        .del-btn { position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.9); border:none; color: red; cursor: pointer; padding: 5px 8px; border-radius: 4px; }
+        .copy-btn { width: 100%; margin-top: 5px; padding: 5px; cursor: pointer; background: #eee; border: none; border-radius: 4px; }
+        #status { margin-top: 10px; font-size: 14px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="text-align:right"><a href="/logout" style="color:red;text-decoration:none">退出</a></div>
+        
+        <div class="upload-section">
+            <h2>☁️ CloudGallery</h2>
+            <button class="btn" onclick="document.getElementById('fileInput').click()">＋ 上传图片</button>
+            <input type="file" id="fileInput" accept="image/*" multiple onchange="startUpload()">
+            <div id="status">准备就绪 (支持大图自动压缩)</div>
+        </div>
+
+        <div class="grid">
+            {% for img in images %}
+            <div class="card" id="card-{{ loop.index0 }}">
+                <img src="{{ img.raw_url }}" onclick="window.open('{{ img.raw_url }}', '_blank')">
+                <button class="del-btn" onclick="deleteImg('{{ img.name }}', {{ loop.index0 }})">×</button>
+                <div class="info">
+                    <div>{{ img.name }}</div>
+                    <div style="color:#999">{{ img.size_fmt }}</div>
+                    <button class="copy-btn" onclick="copyUrl('{{ img.raw_url }}')">复制链接</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        // --- 压缩逻辑 ---
+        async function compress(file) {
+            return new Promise(resolve => {
+                if(file.size < 1024*1024) return resolve(file); // 小于1MB不压缩
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = e => {
+                    const img = new Image();
+                    img.src = e.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const w = Math.min(1920, img.width);
+                        const h = img.height * (w / img.width);
+                        canvas.width = w; canvas.height = h;
+                        ctx.drawImage(img, 0, 0, w, h);
+                        canvas.toBlob(blob => resolve(new File([blob], file.name, {type:'image/jpeg'})), 'image/jpeg', 0.8);
+                    }
+                }
+            });
+        }
+
+        async function startUpload() {
+            const input = document.getElementById('fileInput');
+            if(!input.files.length) return;
+            const status = document.getElementById('status');
+            const fd = new FormData();
+            
+            status.innerText = "⏳ 正在压缩处理...";
+            for(let f of input.files) fd.append('files', await compress(f));
+            
+            status.innerText = "🚀 正在上传到 GitHub...";
+            try {
+                const res = await fetch('/upload', {method:'POST', body:fd});
+                const d = await res.json();
+                if(d.status === 'success') {
+                    status.innerText = "✅ 上传成功，刷新中...";
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    status.innerText = "❌ 失败: " + d.error;
+                }
+            } catch(e) { status.innerText = "❌ 网络错误"; }
+        }
+
+        async function deleteImg(name, idx) {
+            if(!confirm('删除?')) return;
+            await fetch('/delete', {method:'POST', body: new URLSearchParams({filename:name})});
+            document.getElementById('card-'+idx).remove();
+        }
+
+        function copyUrl(url) {
+            navigator.clipboard.writeText(url);
+            alert('已复制');
+        }
+    </script>
+</body>
+</html>
