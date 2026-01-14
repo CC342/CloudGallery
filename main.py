@@ -153,4 +153,225 @@ HTML_TEMPLATE = """
                 <button class="lb-ctl-btn" onclick="copyCurrentLink()" title="复制链接">🔗</button>
             </div>
         </div>
-        <div class="filmstrip-container"><div class="filmstrip"
+        <div class="filmstrip-container"><div class="filmstrip" id="filmstrip" onclick="event.stopPropagation()"></div></div>
+    </div>
+
+    <script>
+        const galleryData = [
+            {% for img in images %}
+            { name: "{{img.name}}", url: "{{img.raw_url}}", view_url: "{{img.view_url}}" },
+            {% endfor %}
+        ];
+        let curIdx = 0, scale = 1;
+
+        // --- 核心：前端压缩逻辑 (防止 413 错误) ---
+        async function compressImage(file) {
+            return new Promise((resolve) => {
+                const maxWidth = 1920; 
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > maxWidth) {
+                            height = Math.round(height * (maxWidth / width));
+                            width = maxWidth;
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        canvas.toBlob((blob) => {
+                            resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+                        }, 'image/jpeg', 0.8);
+                    };
+                };
+            });
+        }
+
+        async function startUploadProcess() {
+            const inp = document.getElementById('fileInput');
+            if (!inp.files.length) return;
+            const status = document.getElementById('status');
+            const fd = new FormData();
+            
+            status.innerText = `⏳ 正在压缩 ${inp.files.length} 张图片...`;
+            
+            for (let f of inp.files) {
+                if (f.size > 1024 * 1024) {
+                    try {
+                        const compressedFile = await compressImage(f);
+                        fd.append('files', compressedFile);
+                    } catch(e) { fd.append('files', f); }
+                } else {
+                    fd.append('files', f);
+                }
+            }
+
+            status.innerText = `🚀 正在上传中...`;
+            
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: fd });
+                if (res.status === 413) {
+                    status.innerText = `❌ 图片太大 (Vercel限制4.5MB)`; return;
+                }
+                const d = await res.json();
+                if(d.status==='success') {
+                    status.innerText = `✅ 成功上传 ${d.count} 张!`;
+                    setTimeout(()=>location.reload(), 1000);
+                } else {
+                    status.innerText = `❌ 失败: ${d.error}`;
+                }
+            } catch(e) {
+                status.innerText = `❌ 网络异常: ${e.message}`;
+            }
+        }
+
+        async function deleteImage(name, idx) {
+            if(!confirm('确定删除?')) return;
+            const fd = new FormData(); fd.append('filename', name);
+            const res = await fetch('/delete', { method: 'POST', body: fd });
+            if ((await res.json()).status === 'success') document.getElementById('card-'+idx).remove();
+        }
+
+        function openViewer(idx) {
+            curIdx = idx;
+            const lb = document.getElementById('lightbox');
+            const fs = document.getElementById('filmstrip');
+            fs.innerHTML = '';
+            galleryData.forEach((img, i) => {
+                const t = document.createElement('img');
+                t.src = img.url; t.className = `thumb ${i===idx?'active':''}`;
+                t.onclick = () => showImage(i);
+                fs.appendChild(t);
+            });
+            lb.style.display = 'flex';
+            setTimeout(() => lb.style.opacity = '1', 10);
+            showImage(idx);
+        }
+
+        function showImage(idx) {
+            curIdx = idx; scale = 1;
+            const img = document.getElementById('lb-img');
+            img.src = galleryData[idx].url;
+            img.style.transform = `scale(1)`;
+            document.querySelectorAll('.thumb').forEach((t, i) => {
+                t.className = `thumb ${i===idx?'active':''}`;
+                if(i===idx) t.scrollIntoView({behavior:"smooth", inline:"center"});
+            });
+        }
+
+        function closeViewer(e) { 
+            if(!e || e.target === e.currentTarget || e.target.classList.contains('floating-close')) {
+                document.getElementById('lightbox').style.display = 'none'; 
+            }
+        }
+        function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
+        function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
+        function copyCurrentLink() { copyLink(null, galleryData[curIdx].view_url); alert('链接已复制'); }
+        function updateRes(img) { if(img.naturalWidth) img.closest('.card').querySelector('.res-tag').innerText = img.naturalWidth+'x'+img.naturalHeight; }
+        function copyLink(btn, txt) { navigator.clipboard.writeText(txt); if(btn){let t=btn.innerText;btn.innerText='✅';setTimeout(()=>btn.innerText=t,1500);} }
+        function copyMarkdown(btn, n, u) { copyLink(btn, `![${n}](${u})`); }
+        
+        document.getElementById('lb-img').addEventListener('wheel', function(e) {
+            e.preventDefault(); e.deltaY < 0 ? zoom(0.1) : zoom(-0.1);
+        }, { passive: false });
+    </script>
+</body>
+</html>
+"""
+
+# ================= 后端逻辑 =================
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        if request.form.get('username') == ADMIN_USER and request.form.get('password') == ADMIN_PASS:
+            session.permanent = True; session['logged_in'] = True; return redirect('/')
+        return render_template_string(LOGIN_TEMPLATE, error="Error")
+    return render_template_string(LOGIN_TEMPLATE)
+
+@app.route('/logout')
+def logout(): session.pop('logged_in', None); return redirect('/login')
+
+@app.route('/')
+@login_required
+def home():
+    if not GITHUB_TOKEN or not GITHUB_REPO: return "Missing Env"
+    try:
+        headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+        r = requests.get(f"{GITHUB_API_BASE}?ref={GITHUB_BRANCH}&t={datetime.datetime.now().timestamp()}", headers=headers)
+        if r.status_code != 200: return f"GitHub API Error: {r.status_code} {r.text}"
+        
+        files_data = r.json()
+        images = []
+        if isinstance(files_data, list):
+            for item in files_data:
+                if item['type'] == 'file' and item['name'].lower().endswith(('.png','.jpg','.jpeg','.gif','.webp','.bmp')):
+                    raw_url = f"{CDN_BASE}/{item['name']}"
+                    images.append({
+                        "name": item['name'],
+                        "raw_url": raw_url,
+                        "view_url": f"/view/{item['name']}",
+                        "real_url": raw_url,
+                        "size_fmt": format_size(item['size'])
+                    })
+        images.reverse()
+        return render_template_string(HTML_TEMPLATE, images=images)
+    except Exception as e: return f"Error: {str(e)}"
+
+@app.route('/upload', methods=['POST'])
+@login_required
+def upload_file():
+    files = request.files.getlist('files')
+    count = 0
+    errors = []
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    
+    for file in files:
+        if not file.filename: continue
+        ext = os.path.splitext(file.filename)[1].lower()
+        if not ext: ext = ".jpg"
+        name = f"{uuid.uuid4().hex[:4]}{ext}"
+        try:
+            # 读取并上传
+            file_content = base64.b64encode(file.read()).decode('utf-8')
+            data = {"message": f"Up {name}", "content": file_content, "branch": GITHUB_BRANCH}
+            r = requests.put(f"{GITHUB_API_BASE}/{name}", json=data, headers=headers)
+            
+            if r.status_code in [200, 201]:
+                count += 1
+            else:
+                errors.append(f"{file.filename}: {r.status_code} {r.text}")
+        except Exception as e: 
+            errors.append(f"{file.filename}: {str(e)}")
+    
+    if count > 0:
+        return jsonify({"status": "success", "count": count})
+    else:
+        return jsonify({"status": "error", "error": " | ".join(errors) if errors else "Upload failed"})
+
+@app.route('/delete', methods=['POST'])
+@login_required
+def delete_file():
+    name = request.form.get('filename')
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    try:
+        r = requests.get(f"{GITHUB_API_BASE}/{name}?ref={GITHUB_BRANCH}", headers=headers)
+        if r.status_code != 200: return jsonify({"error": "File not found"})
+        sha = r.json()['sha']
+        data = {"message": f"Del {name}", "sha": sha, "branch": GITHUB_BRANCH}
+        requests.delete(f"{GITHUB_API_BASE}/{name}", json=data, headers=headers)
+        return jsonify({"status": "success"})
+    except Exception as e: return jsonify({"error": str(e)})
+
+@app.route('/view/<path:filename>')
+def view_image(filename):
+    real_url = f"{CDN_BASE}/{filename}"
+    return render_template_string(VIEW_TEMPLATE, real_url=real_url)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=7860)
