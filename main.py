@@ -8,7 +8,7 @@ from functools import wraps
 from flask import Flask, request, jsonify, render_template_string, redirect, session, url_for
 from flask_cors import CORS
 
-# 1. 移除了 ProxyFix，防止 Vercel 报错 500
+# 1. 彻底移除了 ProxyFix，防止 Vercel 报错 500
 app = Flask(__name__)
 CORS(app)
 
@@ -20,7 +20,7 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30)
 )
 
-# 2. 恢复从 Vercel 环境变量读取
+# 2. 从 Vercel 环境变量读取
 ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
