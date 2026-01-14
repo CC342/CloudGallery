@@ -7,11 +7,10 @@ import tempfile
 from functools import wraps
 from flask import Flask, request, jsonify, render_template_string, redirect, session, url_for
 from flask_cors import CORS
-from werkzeug.middleware.proxy_fix import ProxyFix
 
+# 1. 移除了 ProxyFix，防止 Vercel 报错 500
 app = Flask(__name__)
 CORS(app)
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # --- 配置区域 ---
 app.secret_key = os.environ.get("SECRET_KEY", "my-fixed-secret-key-2026")
@@ -21,17 +20,17 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30)
 )
 
-# 环境变量 (Vercel 设置)
+# 2. 恢复从 Vercel 环境变量读取
 ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")
-GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "vercel")
+# 默认分支设为你现在的 vercel，防呆设计
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "vercel") 
 
-# GitHub API & CDN
 GITHUB_API_BASE = f"https://api.github.com/repos/{GITHUB_REPO}/contents"
 CDN_BASE = f"https://cdn.jsdelivr.net/gh/{GITHUB_REPO}@{GITHUB_BRANCH}"
-CACHE_DIR = tempfile.gettempdir() # Vercel 专用临时目录
+CACHE_DIR = tempfile.gettempdir()
 
 def format_size(size):
     if size is None: return "未知"
@@ -48,17 +47,11 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# =========================================================
-# 🎨 UI 模板区域 (你的设计已完整保留)
-# =========================================================
-
-# 1. 登录页面 (保留你的 Unsplash 背景和磨砂玻璃)
+# ================= UI 模板 =================
 LOGIN_TEMPLATE = """<!DOCTYPE html><html><head><title>登录</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;height:100vh;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;background:url('https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;background-size:cover}.glass-box{width:300px;padding:40px 30px;text-align:center;background:rgba(255,255,255,0.1);backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);border-radius:24px;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 32px 0 rgba(0,0,0,0.1);color:white}h2{margin:0 0 25px 0;font-weight:500}input{width:100%;padding:14px;margin:10px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;outline:none;transition:0.3s;box-sizing:border-box}input:focus{background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.8)}button{width:100%;padding:14px;margin-top:20px;background:rgba(255,255,255,0.9);color:#333;border:none;border-radius:12px;font-weight:bold;cursor:pointer;transition:0.3s}button:hover{background:white;transform:translateY(-2px)}.err{color:#ffcccc;background:rgba(255,0,0,0.2);padding:5px;border-radius:5px;font-size:14px;margin-bottom:10px}</style></head><body><div class="glass-box"><h2>CloudGallery</h2>{% if error %}<div class="err">{{ error }}</div>{% endif %}<form method="post"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button type="submit">Sign In</button></form></div></body></html>"""
 
-# 2. 全屏查看 (微调：直接使用 CDN 链接)
 VIEW_TEMPLATE = """<!DOCTYPE html><html><head><title>查看</title><style>body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden}img{width:100%;height:100%;object-fit:contain}</style></head><body><img src="{{ real_url }}"></body></html>"""
 
-# 3. 主页模板 (CloudGallery V11.0 你的完整 CSS/JS)
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -79,7 +72,7 @@ HTML_TEMPLATE = """
         .btn { background: white; border: 2px solid var(--primary); color: var(--primary); padding: 10px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn:hover { background: var(--primary); color: white; }
         .upload-wrapper input { position: absolute; left: 0; top: 0; font-size: 100px; opacity: 0; cursor: pointer; }
-        #status { margin-top: 15px; color: #666; font-size: 14px; }
+        #status { margin-top: 15px; color: #666; font-size: 14px; word-break: break-all; }
         .gallery-header { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
         .refresh-btn { background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; display: flex; align-items: center; gap: 5px; }
         .refresh-btn:hover { color: var(--primary); }
@@ -122,7 +115,7 @@ HTML_TEMPLATE = """
             <h2 style="margin-top:0;">☁️ CloudGallery (GitHub)</h2>
             <div class="upload-wrapper">
                 <button class="btn">＋ 上传图片 (多选)</button>
-                <input type="file" id="fileInput" accept="image/*" multiple onchange="handleUpload()">
+                <input type="file" id="fileInput" accept="image/*" multiple onchange="startUploadProcess()">
             </div>
             <div id="status">准备就绪</div>
         </div>
@@ -160,173 +153,4 @@ HTML_TEMPLATE = """
                 <button class="lb-ctl-btn" onclick="copyCurrentLink()" title="复制链接">🔗</button>
             </div>
         </div>
-        <div class="filmstrip-container"><div class="filmstrip" id="filmstrip" onclick="event.stopPropagation()"></div></div>
-    </div>
-
-    <script>
-        const galleryData = [
-            {% for img in images %}
-            { name: "{{img.name}}", url: "{{img.raw_url}}", view_url: "{{img.view_url}}" },
-            {% endfor %}
-        ];
-        let curIdx = 0, scale = 1;
-
-        async function handleUpload() {
-            const inp = document.getElementById('fileInput');
-            if (!inp.files.length) return;
-            document.getElementById('status').innerText = `🚀 上传 ${inp.files.length} 张...`;
-            const fd = new FormData();
-            for (let f of inp.files) fd.append('files', f);
-            try {
-                const res = await fetch('/upload', { method: 'POST', body: fd });
-                const d = await res.json();
-                if(d.status==='success') {
-                    document.getElementById('status').innerText = `✅ 上传成功`;
-                    setTimeout(()=>location.reload(), 1000);
-                } else {
-                    document.getElementById('status').innerText = `❌ 失败: ${d.error}`;
-                }
-            } catch(e) { document.getElementById('status').innerText = `❌ 网络错误`; }
-        }
-
-        async function deleteImage(name, idx) {
-            if(!confirm('确定删除?')) return;
-            const fd = new FormData(); fd.append('filename', name);
-            const res = await fetch('/delete', { method: 'POST', body: fd });
-            if ((await res.json()).status === 'success') document.getElementById('card-'+idx).remove();
-        }
-
-        function openViewer(idx) {
-            curIdx = idx;
-            const lb = document.getElementById('lightbox');
-            const fs = document.getElementById('filmstrip');
-            fs.innerHTML = '';
-            galleryData.forEach((img, i) => {
-                const t = document.createElement('img');
-                t.src = img.url; t.className = `thumb ${i===idx?'active':''}`;
-                t.onclick = () => showImage(i);
-                fs.appendChild(t);
-            });
-            lb.style.display = 'flex';
-            setTimeout(() => lb.style.opacity = '1', 10);
-            showImage(idx);
-        }
-
-        function showImage(idx) {
-            curIdx = idx; scale = 1;
-            const img = document.getElementById('lb-img');
-            img.src = galleryData[idx].url;
-            img.style.transform = `scale(1)`;
-            document.querySelectorAll('.thumb').forEach((t, i) => {
-                t.className = `thumb ${i===idx?'active':''}`;
-                if(i===idx) t.scrollIntoView({behavior:"smooth", inline:"center"});
-            });
-        }
-
-        function closeViewer(e) { 
-            if(!e || e.target === e.currentTarget || e.target.classList.contains('floating-close')) {
-                document.getElementById('lightbox').style.display = 'none'; 
-            }
-        }
-        function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
-        function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
-        function copyCurrentLink() { copyLink(null, galleryData[curIdx].view_url); alert('链接已复制'); }
-        function updateRes(img) { if(img.naturalWidth) img.closest('.card').querySelector('.res-tag').innerText = img.naturalWidth+'x'+img.naturalHeight; }
-        function copyLink(btn, txt) { navigator.clipboard.writeText(txt); if(btn){let t=btn.innerText;btn.innerText='✅';setTimeout(()=>btn.innerText=t,1500);} }
-        function copyMarkdown(btn, n, u) { copyLink(btn, `![${n}](${u})`); }
-        
-        document.getElementById('lb-img').addEventListener('wheel', function(e) {
-            e.preventDefault(); e.deltaY < 0 ? zoom(0.1) : zoom(-0.1);
-        }, { passive: false });
-    </script>
-</body>
-</html>
-"""
-
-# =========================================================
-# 🚀 核心后端逻辑 (GitHub API)
-# =========================================================
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        if request.form.get('username') == ADMIN_USER and request.form.get('password') == ADMIN_PASS:
-            session.permanent = True; session['logged_in'] = True; return redirect('/')
-        return render_template_string(LOGIN_TEMPLATE, error="Error")
-    return render_template_string(LOGIN_TEMPLATE)
-
-@app.route('/logout')
-def logout(): session.pop('logged_in', None); return redirect('/login')
-
-@app.route('/')
-@login_required
-def home():
-    if not GITHUB_TOKEN or not GITHUB_REPO: return "Missing Env"
-    try:
-        # 调用 GitHub API 获取列表
-        headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-        # 加时间戳防止 API 缓存
-        r = requests.get(f"{GITHUB_API_BASE}?ref={GITHUB_BRANCH}&t={datetime.datetime.now().timestamp()}", headers=headers)
-        files_data = r.json()
-        images = []
-        if isinstance(files_data, list):
-            for item in files_data:
-                if item['type'] == 'file' and item['name'].lower().endswith(('.png','.jpg','.jpeg','.gif','.webp','.bmp')):
-                    # 🔥 重点：直接构造 jsDelivr 链接，不再需要 /file/ 代理
-                    raw_url = f"{CDN_BASE}/{item['name']}"
-                    images.append({
-                        "name": item['name'],
-                        "raw_url": raw_url,
-                        "view_url": f"/view/{item['name']}",
-                        "real_url": raw_url,
-                        "size_fmt": format_size(item['size'])
-                    })
-        images.reverse()
-        return render_template_string(HTML_TEMPLATE, images=images)
-    except Exception as e: return f"Error: {str(e)}"
-
-@app.route('/upload', methods=['POST'])
-@login_required
-def upload_file():
-    files = request.files.getlist('files')
-    count = 0
-    print(f"DEBUG: Starting upload...")
-    print(f"DEBUG: Repo: {GITHUB_REPO}, Branch: {GITHUB_BRANCH}")
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    for file in files:
-        if not file.filename: continue
-        ext = os.path.splitext(file.filename)[1].lower()
-        if not ext: ext = ".jpg"
-        name = f"{uuid.uuid4().hex[:4]}{ext}"
-        try:
-            # GitHub API 需要 Base64 编码
-            file_content = base64.b64encode(file.read()).decode('utf-8')
-            data = {"message": f"Up {name}", "content": file_content, "branch": GITHUB_BRANCH}
-            requests.put(f"{GITHUB_API_BASE}/{name}", json=data, headers=headers)
-            count += 1
-        except: pass
-    return jsonify({"status": "success", "count": count})
-
-@app.route('/delete', methods=['POST'])
-@login_required
-def delete_file():
-    name = request.form.get('filename')
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    try:
-        # 1. 获取 SHA
-        r = requests.get(f"{GITHUB_API_BASE}/{name}?ref={GITHUB_BRANCH}", headers=headers)
-        sha = r.json()['sha']
-        # 2. 删除
-        data = {"message": f"Del {name}", "sha": sha, "branch": GITHUB_BRANCH}
-        requests.delete(f"{GITHUB_API_BASE}/{name}", json=data, headers=headers)
-        return jsonify({"status": "success"})
-    except Exception as e: return jsonify({"error": str(e)})
-
-@app.route('/view/<path:filename>')
-def view_image(filename):
-    # 直接渲染你的 VIEW_TEMPLATE，图片地址指向 CDN
-    real_url = f"{CDN_BASE}/{filename}"
-    return render_template_string(VIEW_TEMPLATE, real_url=real_url)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=7860)
+        <div class="filmstrip-container"><div class="filmstrip"
