@@ -22,10 +22,12 @@ ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")
-GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH")
 
 GITHUB_API_BASE = f"https://api.github.com/repos/{GITHUB_REPO}/contents"
-CDN_BASE = f"https://cdn.jsdelivr.net/gh/{GITHUB_REPO}"
+
+# 🔥 核心修改：链接前缀留空，或者设为你的 Worker 域名 + /file
+# 建议：留空字符串，这样前端会自动拼接当前域名
+CDN_BASE = "/file" 
 
 def format_size(size):
     if size is None: return "未知"
@@ -61,7 +63,6 @@ def home():
     if not GITHUB_TOKEN or not GITHUB_REPO: return "错误: 环境变量未设置"
     try:
         headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-        # 获取列表
         r = requests.get(f"{GITHUB_API_BASE}?ref={GITHUB_BRANCH}&t={datetime.datetime.now().timestamp()}", headers=headers)
         
         if r.status_code != 200: return f"连接 GitHub 失败: {r.status_code} <br> {r.text}"
@@ -71,6 +72,8 @@ def home():
         if isinstance(files_data, list):
             for item in files_data:
                 if item['type'] == 'file' and item['name'].lower().endswith(('.png','.jpg','.jpeg','.gif','.webp','.bmp')):
+                    # 这里生成的链接就是 /file/xxx.jpg
+                    # 浏览器会自动拼成 https://你的域名.com/file/xxx.jpg
                     raw_url = f"{CDN_BASE}/{item['name']}"
                     images.append({
                         "name": item['name'],
@@ -78,9 +81,11 @@ def home():
                         "view_url": f"/view/{item['name']}",
                         "size_fmt": format_size(item['size'])
                     })
+        
+        # 排序：文件名反转
+        images.sort(key=lambda x: x['name'])
         images.reverse()
         
-        # 🔥 关键修改：把配置传递给前端，让前端直接上传
         config = {
             "token": GITHUB_TOKEN,
             "repo": GITHUB_REPO,
@@ -91,12 +96,15 @@ def home():
         
     except Exception as e: return f"System Error: {str(e)}"
 
-# /upload 路由已删除，改为前端直传
+@app.route('/upload', methods=['POST'])
+@login_required
+def upload_file():
+    # 后端不再处理上传，保留此接口防报错，实际走前端直传
+    return jsonify({"status": "error", "error": "Use frontend upload"})
 
 @app.route('/delete', methods=['POST'])
 @login_required
 def delete_file():
-    # 删除比较轻量，依然走后端代理，比较安全
     name = request.form.get('filename')
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     try:
@@ -110,7 +118,8 @@ def delete_file():
 
 @app.route('/view/<path:filename>')
 def view_image(filename):
-    real_url = f"{CDN_BASE}/{filename}"
+    # 预览也走 Worker 代理
+    real_url = f"/file/{filename}"
     return f'<html><body style="margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh"><img src="{real_url}" style="max-width:100%;max-height:100%"></body></html>'
 
 if __name__ == '__main__':
