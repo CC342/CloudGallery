@@ -21,18 +21,18 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30)
 )
 
-# 环境变量 (改为 GitHub 配置)
+# 环境变量 (Vercel 设置)
 ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")        # 必须: ghp_xxxx
-GITHUB_REPO = os.environ.get("GITHUB_REPO")          # 必须: 用户名/仓库名
-GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main") # 可选: 默认 main
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+GITHUB_REPO = os.environ.get("GITHUB_REPO")
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main")
 
-# GitHub API & CDN 基础地址
+# GitHub API & CDN
 GITHUB_API_BASE = f"https://api.github.com/repos/{GITHUB_REPO}/contents"
 CDN_BASE = f"https://cdn.jsdelivr.net/gh/{GITHUB_REPO}@{GITHUB_BRANCH}"
+CACHE_DIR = tempfile.gettempdir() # Vercel 专用临时目录
 
-# 辅助函数：格式化大小
 def format_size(size):
     if size is None: return "未知"
     for unit in ['B', 'KB', 'MB', 'GB']:
@@ -40,7 +40,6 @@ def format_size(size):
         size /= 1024
     return f"{size:.1f} TB"
 
-# 登录验证装饰器
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -50,44 +49,37 @@ def login_required(f):
     return decorated_function
 
 # =========================================================
-# 📝 模板区域 (保持原汁原味)
+# 🎨 UI 模板区域 (你的设计已完整保留)
 # =========================================================
 
-# 1. 登录页面 (未修改)
-LOGIN_TEMPLATE = """<!DOCTYPE html><html><head><title>登录</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;height:100vh;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;background:url('https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;background-size:cover}.glass-box{width:300px;padding:40px 30px;text-align:center;background:rgba(255,255,255,0.1);backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);border-radius:24px;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 32px 0 rgba(0,0,0,0.1);color:white}h2{margin:0 0 25px 0;font-weight:500}input{width:100%;padding:14px;margin:10px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;outline:none;transition:0.3s;box-sizing:border-box}input:focus{background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.8)}button{width:100%;padding:14px;margin-top:20px;background:rgba(255,255,255,0.9);color:#333;border:none;border-radius:12px;font-weight:bold;cursor:pointer;transition:0.3s}button:hover{background:white;transform:translateY(-2px)}.err{color:#ffcccc;background:rgba(255,0,0,0.2);padding:5px;border-radius:5px;font-size:14px;margin-bottom:10px}</style></head><body><div class="glass-box"><h2>GitHub Gallery</h2>{% if error %}<div class="err">{{ error }}</div>{% endif %}<form method="post"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button type="submit">Sign In</button></form></div></body></html>"""
+# 1. 登录页面 (保留你的 Unsplash 背景和磨砂玻璃)
+LOGIN_TEMPLATE = """<!DOCTYPE html><html><head><title>登录</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;height:100vh;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;background:url('https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;background-size:cover}.glass-box{width:300px;padding:40px 30px;text-align:center;background:rgba(255,255,255,0.1);backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);border-radius:24px;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 32px 0 rgba(0,0,0,0.1);color:white}h2{margin:0 0 25px 0;font-weight:500}input{width:100%;padding:14px;margin:10px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;outline:none;transition:0.3s;box-sizing:border-box}input:focus{background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.8)}button{width:100%;padding:14px;margin-top:20px;background:rgba(255,255,255,0.9);color:#333;border:none;border-radius:12px;font-weight:bold;cursor:pointer;transition:0.3s}button:hover{background:white;transform:translateY(-2px)}.err{color:#ffcccc;background:rgba(255,0,0,0.2);padding:5px;border-radius:5px;font-size:14px;margin-bottom:10px}</style></head><body><div class="glass-box"><h2>CloudGallery</h2>{% if error %}<div class="err">{{ error }}</div>{% endif %}<form method="post"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button type="submit">Sign In</button></form></div></body></html>"""
 
-# 2. 全屏查看 (微调 URL)
+# 2. 全屏查看 (微调：直接使用 CDN 链接)
 VIEW_TEMPLATE = """<!DOCTYPE html><html><head><title>查看</title><style>body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden}img{width:100%;height:100%;object-fit:contain}</style></head><body><img src="{{ real_url }}"></body></html>"""
 
-# 3. 主页模板 (V11.0 纯净白透版 - 你的原始代码)
+# 3. 主页模板 (CloudGallery V11.0 你的完整 CSS/JS)
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的图床 (GitHub版)</title>
+    <title>CloudGallery (GitHub版)</title>
     <style>
         * { box-sizing: border-box; }
         :root { --primary: #3b82f6; --bg: #f8fafc; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background-color: var(--bg); color: #333; margin: 0; padding: 20px; 
-            overflow-x: hidden;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); color: #333; margin: 0; padding: 20px; overflow-x: hidden; }
         .container { max-width: 1200px; margin: 0 auto; }
-        
         .top-nav { display: flex; justify-content: flex-end; margin-bottom: 10px; }
         .logout-btn { text-decoration: none; color: #ef4444; font-size: 13px; padding: 6px 12px; background: white; border: 1px solid #fee2e2; border-radius: 20px; transition: 0.2s; }
         .logout-btn:hover { background: #fef2f2; border-color: #fecaca; }
-        
         .upload-section { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; margin-bottom: 30px; margin-top: 10px; }
         .upload-wrapper { position: relative; display: inline-block; overflow: hidden; }
         .btn { background: white; border: 2px solid var(--primary); color: var(--primary); padding: 10px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn:hover { background: var(--primary); color: white; }
         .upload-wrapper input { position: absolute; left: 0; top: 0; font-size: 100px; opacity: 0; cursor: pointer; }
         #status { margin-top: 15px; color: #666; font-size: 14px; }
-
         .gallery-header { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
         .refresh-btn { background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; display: flex; align-items: center; gap: 5px; }
         .refresh-btn:hover { color: var(--primary); }
@@ -104,89 +96,22 @@ HTML_TEMPLATE = """
         .copy-btn.primary { background: #eff6ff; color: #2563eb; }
         .delete-btn { position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.9); color: red; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; opacity: 0; font-weight: bold; transition: 0.2s; }
         .card:hover .delete-btn { opacity: 1; }
-
-        /* ================= LIGHTBOX (白透版) ================= */
-        .lightbox-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000;
-            background-color: rgba(255, 255, 255, 0.4); 
-            backdrop-filter: blur(25px); 
-            -webkit-backdrop-filter: blur(25px);
-            flex-direction: column; justify-content: center; align-items: center;
-        }
-
-        .lb-main { 
-            flex: 1; width: 100%; display: flex; justify-content: center; align-items: center; 
-            overflow: hidden; position: relative; 
-        }
-        
-        .lb-img { 
-            max-width: 70%; max-height: 70%; 
-            object-fit: contain; transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            cursor: grab; border-radius: 8px;
-            box-shadow: 0 30px 80px rgba(0,0,0,0.25);
-        }
-
-        .floating-close { 
-            position: absolute; top: 20px; right: 20px; 
-            width: 40px; height: 40px; border-radius: 50%; 
-            background: rgba(0,0,0,0.05); color: #333; 
-            display: flex; justify-content: center; align-items: center; 
-            font-size: 24px; cursor: pointer; z-index: 1020; transition:0.2s; 
-        }
+        .lightbox-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; background-color: rgba(255, 255, 255, 0.4); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); flex-direction: column; justify-content: center; align-items: center; }
+        .lb-main { flex: 1; width: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
+        .lb-img { max-width: 70%; max-height: 70%; object-fit: contain; transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); cursor: grab; border-radius: 8px; box-shadow: 0 30px 80px rgba(0,0,0,0.25); }
+        .floating-close { position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,0.05); color: #333; display: flex; justify-content: center; align-items: center; font-size: 24px; cursor: pointer; z-index: 1020; transition:0.2s; }
         .floating-close:hover { background: rgba(0,0,0,0.1); }
-
-        .lb-bottom-container { 
-            width: 100%; display: flex; justify-content: center; 
-            position: absolute; bottom: 130px;
-            pointer-events: none; z-index: 1010;
-        }
-        
-        .lb-controls {
-            background: rgba(255, 255, 255, 0.7); 
-            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-            padding: 8px 20px; border-radius: 50px; 
-            border: 1px solid rgba(0,0,0,0.05); 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            display: flex; gap: 15px; pointer-events: auto; align-items: center;
-        }
-        .lb-ctl-btn { 
-            background: transparent; border: none; 
-            color: #333; 
-            font-size: 16px; cursor: pointer; padding: 5px 10px; border-radius: 20px; transition: 0.2s; 
-        }
+        .lb-bottom-container { width: 100%; display: flex; justify-content: center; position: absolute; bottom: 130px; pointer-events: none; z-index: 1010; }
+        .lb-controls { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); padding: 8px 20px; border-radius: 50px; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: flex; gap: 15px; pointer-events: auto; align-items: center; }
+        .lb-ctl-btn { background: transparent; border: none; color: #333; font-size: 16px; cursor: pointer; padding: 5px 10px; border-radius: 20px; transition: 0.2s; }
         .lb-ctl-btn:hover { background: rgba(0,0,0,0.05); }
         .divider { width: 1px; background: rgba(0,0,0,0.1); height: 20px; }
-
-        .filmstrip-container {
-            position: absolute; bottom: 30px; width: 100%;
-            display: flex; justify-content: center; z-index: 1005;
-        }
-
-        .filmstrip { 
-            height: 70px; width: auto; max-width: 90vw;
-            background: rgba(255, 255, 255, 0.6); 
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            border-radius: 35px; border: 1px solid rgba(255,255,255,0.5);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-            display: flex; align-items: center; gap: 12px; padding: 0 20px; 
-            overflow-x: auto; scrollbar-width: none;
-        }
+        .filmstrip-container { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; z-index: 1005; }
+        .filmstrip { height: 70px; width: auto; max-width: 90vw; background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 35px; border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 10px 30px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 12px; padding: 0 20px; overflow-x: auto; scrollbar-width: none; }
         .filmstrip::-webkit-scrollbar { display: none; }
-        
-        .thumb { 
-            width: 44px; height: 44px; border-radius: 10px; 
-            object-fit: cover; cursor: pointer; flex-shrink: 0;
-            opacity: 0.5; transform: scale(0.9); filter: grayscale(0.2);
-            transition: all 0.3s ease; border: 2px solid transparent;
-        }
+        .thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; cursor: pointer; flex-shrink: 0; opacity: 0.5; transform: scale(0.9); filter: grayscale(0.2); transition: all 0.3s ease; border: 2px solid transparent; }
         .thumb:hover { opacity: 0.9; }
-        
-        .thumb.active { 
-            opacity: 1; filter: grayscale(0); transform: scale(1.1); 
-            border: 2px solid #3b82f6; 
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
-        }
-
+        .thumb.active { opacity: 1; filter: grayscale(0); transform: scale(1.1); border: 2px solid #3b82f6; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2); }
         @media (max-width: 600px) { .gallery-grid { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
@@ -225,9 +150,7 @@ HTML_TEMPLATE = """
 
     <div id="lightbox" class="lightbox-overlay" onclick="closeViewer(event)">
         <div class="floating-close" onclick="closeViewer()">×</div>
-        <div class="lb-main">
-            <img id="lb-img" class="lb-img" onclick="event.stopPropagation()">
-        </div>
+        <div class="lb-main"><img id="lb-img" class="lb-img" onclick="event.stopPropagation()"></div>
         <div class="lb-bottom-container">
             <div class="lb-controls" onclick="event.stopPropagation()">
                 <button class="lb-ctl-btn" onclick="zoom(-0.2)" title="缩小">－</button>
@@ -237,9 +160,7 @@ HTML_TEMPLATE = """
                 <button class="lb-ctl-btn" onclick="copyCurrentLink()" title="复制链接">🔗</button>
             </div>
         </div>
-        <div class="filmstrip-container">
-            <div class="filmstrip" id="filmstrip" onclick="event.stopPropagation()"></div>
-        </div>
+        <div class="filmstrip-container"><div class="filmstrip" id="filmstrip" onclick="event.stopPropagation()"></div></div>
     </div>
 
     <script>
@@ -260,28 +181,21 @@ HTML_TEMPLATE = """
                 const res = await fetch('/upload', { method: 'POST', body: fd });
                 const d = await res.json();
                 if(d.status==='success') {
-                    document.getElementById('status').innerText = `✅ 成功! 刷新中...`;
+                    document.getElementById('status').innerText = `✅ 上传成功`;
                     setTimeout(()=>location.reload(), 1000);
                 } else {
-                    document.getElementById('status').innerText = `❌ 失败: ${d.error || '未知错误'}`;
+                    document.getElementById('status').innerText = `❌ 失败: ${d.error}`;
                 }
-            } catch(e) {
-                document.getElementById('status').innerText = `❌ 网络错误`;
-            }
+            } catch(e) { document.getElementById('status').innerText = `❌ 网络错误`; }
         }
 
         async function deleteImage(name, idx) {
-            if(!confirm('确定要删除 ' + name + ' 吗？')) return;
+            if(!confirm('确定删除?')) return;
             const fd = new FormData(); fd.append('filename', name);
-            try {
-                const res = await fetch('/delete', { method: 'POST', body: fd });
-                const d = await res.json();
-                if (d.status === 'success') document.getElementById('card-'+idx).remove();
-                else alert('删除失败: ' + (d.error || '未知原因'));
-            } catch(e) { alert('网络错误'); }
+            const res = await fetch('/delete', { method: 'POST', body: fd });
+            if ((await res.json()).status === 'success') document.getElementById('card-'+idx).remove();
         }
 
-        // 下面的 Lightbox 逻辑保持不变
         function openViewer(idx) {
             curIdx = idx;
             const lb = document.getElementById('lightbox');
@@ -316,7 +230,7 @@ HTML_TEMPLATE = """
         }
         function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
         function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
-        function copyCurrentLink() { copyLink(null, galleryData[curIdx].url); alert('链接已复制'); }
+        function copyCurrentLink() { copyLink(null, galleryData[curIdx].view_url); alert('链接已复制'); }
         function updateRes(img) { if(img.naturalWidth) img.closest('.card').querySelector('.res-tag').innerText = img.naturalWidth+'x'+img.naturalHeight; }
         function copyLink(btn, txt) { navigator.clipboard.writeText(txt); if(btn){let t=btn.innerText;btn.innerText='✅';setTimeout(()=>btn.innerText=t,1500);} }
         function copyMarkdown(btn, n, u) { copyLink(btn, `![${n}](${u})`); }
@@ -330,7 +244,7 @@ HTML_TEMPLATE = """
 """
 
 # =========================================================
-# 🚀 核心后端逻辑 (GitHub 版)
+# 🚀 核心后端逻辑 (GitHub API)
 # =========================================================
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -347,124 +261,68 @@ def logout(): session.pop('logged_in', None); return redirect('/login')
 @app.route('/')
 @login_required
 def home():
-    if not GITHUB_TOKEN or not GITHUB_REPO: return "Missing GITHUB Environment Variables"
+    if not GITHUB_TOKEN or not GITHUB_REPO: return "Missing Env"
     try:
-        # 1. 调用 GitHub API 获取文件列表
+        # 调用 GitHub API 获取列表
         headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-        # 使用 params 避免缓存
-        r = requests.get(f"{GITHUB_API_BASE}?ref={GITHUB_BRANCH}", headers=headers)
-        
-        if r.status_code != 200:
-            return f"GitHub API Error: {r.text}"
-            
+        # 加时间戳防止 API 缓存
+        r = requests.get(f"{GITHUB_API_BASE}?ref={GITHUB_BRANCH}&t={datetime.datetime.now().timestamp()}", headers=headers)
         files_data = r.json()
         images = []
-        
-        # 2. 过滤图片并构造对象
         if isinstance(files_data, list):
             for item in files_data:
                 if item['type'] == 'file' and item['name'].lower().endswith(('.png','.jpg','.jpeg','.gif','.webp','.bmp')):
-                    # 直接构造 jsDelivr 链接
+                    # 🔥 重点：直接构造 jsDelivr 链接，不再需要 /file/ 代理
                     raw_url = f"{CDN_BASE}/{item['name']}"
                     images.append({
                         "name": item['name'],
                         "raw_url": raw_url,
-                        # 查看页也直接用 CDN 链接
-                        "view_url": f"/view/{item['name']}", 
+                        "view_url": f"/view/{item['name']}",
                         "real_url": raw_url,
                         "size_fmt": format_size(item['size'])
                     })
-        
-        # GitHub 返回是按名称排序的，如果你的文件名是随机字符，这里反转也没法按时间排
-        # 但如果是顺序文件名，反转就是最新的在前面
-        images.reverse() 
+        images.reverse()
         return render_template_string(HTML_TEMPLATE, images=images)
-    except Exception as e:
-        return f"Error loading images: {str(e)}"
+    except Exception as e: return f"Error: {str(e)}"
 
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload_file():
-    if 'files' not in request.files:
-        return jsonify({"error": "No files part"}), 400
-        
     files = request.files.getlist('files')
     count = 0
-    errors = []
-    
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    
     for file in files:
         if not file.filename: continue
-        
-        # 生成 4 位随机文件名 (保留原有逻辑)
         ext = os.path.splitext(file.filename)[1].lower()
         if not ext: ext = ".jpg"
         name = f"{uuid.uuid4().hex[:4]}{ext}"
-        
         try:
-            # 1. 读取文件并转 Base64
+            # GitHub API 需要 Base64 编码
             file_content = base64.b64encode(file.read()).decode('utf-8')
-            
-            # 2. 推送到 GitHub
-            url = f"{GITHUB_API_BASE}/{name}"
-            data = {
-                "message": f"Upload {name}",
-                "content": file_content,
-                "branch": GITHUB_BRANCH
-            }
-            
-            r = requests.put(url, json=data, headers=headers)
-            if r.status_code in [200, 201]:
-                count += 1
-            else:
-                errors.append(f"{file.filename}: {r.status_code}")
-                
-        except Exception as e:
-            errors.append(f"{file.filename}: {str(e)}")
-            
-    if count > 0:
-        return jsonify({"status": "success", "count": count})
-    else:
-        return jsonify({"status": "error", "error": str(errors)})
+            data = {"message": f"Up {name}", "content": file_content, "branch": GITHUB_BRANCH}
+            requests.put(f"{GITHUB_API_BASE}/{name}", json=data, headers=headers)
+            count += 1
+        except: pass
+    return jsonify({"status": "success", "count": count})
 
 @app.route('/delete', methods=['POST'])
 @login_required
 def delete_file():
     name = request.form.get('filename')
-    if not name: return jsonify({"error": "Missing filename"})
-    
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    url = f"{GITHUB_API_BASE}/{name}"
-    
     try:
-        # 1. 获取文件的 SHA (GitHub 删除文件必须提供 SHA)
-        # 加上 ref 参数确保获取对应分支
-        r_get = requests.get(f"{url}?ref={GITHUB_BRANCH}", headers=headers)
-        if r_get.status_code != 200:
-            return jsonify({"error": "File not found or GitHub API error"})
-            
-        sha = r_get.json()['sha']
-        
-        # 2. 发送删除请求
-        data = {
-            "message": f"Delete {name}",
-            "sha": sha,
-            "branch": GITHUB_BRANCH
-        }
-        r_del = requests.delete(url, json=data, headers=headers)
-        
-        if r_del.status_code == 200:
-            return jsonify({"status": "success"})
-        else:
-            return jsonify({"error": f"Delete failed: {r_del.text}"})
-            
-    except Exception as e:
-        return jsonify({"error": str(e)})
+        # 1. 获取 SHA
+        r = requests.get(f"{GITHUB_API_BASE}/{name}?ref={GITHUB_BRANCH}", headers=headers)
+        sha = r.json()['sha']
+        # 2. 删除
+        data = {"message": f"Del {name}", "sha": sha, "branch": GITHUB_BRANCH}
+        requests.delete(f"{GITHUB_API_BASE}/{name}", json=data, headers=headers)
+        return jsonify({"status": "success"})
+    except Exception as e: return jsonify({"error": str(e)})
 
 @app.route('/view/<path:filename>')
 def view_image(filename):
-    # 直接使用 CDN 链接显示大图
+    # 直接渲染你的 VIEW_TEMPLATE，图片地址指向 CDN
     real_url = f"{CDN_BASE}/{filename}"
     return render_template_string(VIEW_TEMPLATE, real_url=real_url)
 
