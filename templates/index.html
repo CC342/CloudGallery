@@ -15,16 +15,11 @@
         .container { max-width: 1200px; margin: 0 auto; }
         .top-nav { display: flex; justify-content: flex-end; margin-bottom: 10px; }
         .logout-btn { text-decoration: none; color: #ef4444; font-size: 13px; padding: 6px 12px; background: white; border: 1px solid #fee2e2; border-radius: 20px; transition: 0.2s; }
-        .logout-btn:hover { background: #fef2f2; border-color: #fecaca; }
         .upload-section { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; margin-bottom: 30px; margin-top: 10px; }
-        .upload-wrapper { position: relative; display: inline-block; overflow: hidden; }
         .btn { background: white; border: 2px solid var(--primary); color: var(--primary); padding: 10px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn:hover { background: var(--primary); color: white; }
-        .upload-wrapper input { position: absolute; left: 0; top: 0; font-size: 100px; opacity: 0; cursor: pointer; }
+        #fileInput { display: none; }
         #status { margin-top: 15px; color: #666; font-size: 14px; word-break: break-all; }
-        .gallery-header { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
-        .refresh-btn { background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; display: flex; align-items: center; gap: 5px; }
-        .refresh-btn:hover { color: var(--primary); }
         .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
         .card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; transition: 0.2s; }
         .card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
@@ -39,7 +34,7 @@
         .delete-btn { position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.9); color: red; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; opacity: 0; font-weight: bold; transition: 0.2s; }
         .card:hover .delete-btn { opacity: 1; }
         
-        /* Lightbox 样式 */
+        /* Lightbox */
         .lightbox-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; background-color: rgba(255, 255, 255, 0.4); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); flex-direction: column; justify-content: center; align-items: center; }
         .lb-main { flex: 1; width: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
         .lb-img { max-width: 70%; max-height: 70%; object-fit: contain; transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); cursor: grab; border-radius: 8px; box-shadow: 0 30px 80px rgba(0,0,0,0.25); }
@@ -52,7 +47,6 @@
         .divider { width: 1px; background: rgba(0,0,0,0.1); height: 20px; }
         .filmstrip-container { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; z-index: 1005; }
         .filmstrip { height: 70px; width: auto; max-width: 90vw; background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 35px; border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 10px 30px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 12px; padding: 0 20px; overflow-x: auto; scrollbar-width: none; }
-        .filmstrip::-webkit-scrollbar { display: none; }
         .thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; cursor: pointer; flex-shrink: 0; opacity: 0.5; transform: scale(0.9); filter: grayscale(0.2); transition: all 0.3s ease; border: 2px solid transparent; }
         .thumb:hover { opacity: 0.9; }
         .thumb.active { opacity: 1; filter: grayscale(0); transform: scale(1.1); border: 2px solid #3b82f6; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2); }
@@ -63,15 +57,15 @@
     <div class="container">
         <div class="top-nav"><a href="/logout" class="logout-btn">🔴 退出</a></div>
         <div class="upload-section">
-            <h2 style="margin-top:0;">☁️ CloudGallery (GitHub)</h2>
+            <h2 style="margin-top:0;">☁️ CloudGallery (VIP 直传)</h2>
             <div class="upload-wrapper">
-                <button class="btn">＋ 上传图片 (多选)</button>
+                <button class="btn" onclick="document.getElementById('fileInput').click()">＋ 上传原图 (无限大小)</button>
                 <input type="file" id="fileInput" accept="image/*" multiple onchange="uploadFiles()">
             </div>
-            <div id="status">准备就绪 (原图上传)</div>
+            <div id="status">准备就绪</div>
         </div>
         <div class="gallery-header">
-            <h3 style="margin:0">🖼️ 图片列表 ({{ images|length }})</h3>
+            <h3 style="margin:0">🖼️ 图片列表</h3>
             <button class="refresh-btn" onclick="location.reload()">🔄 刷新</button>
         </div>
         <div class="gallery-grid">
@@ -84,7 +78,7 @@
                 <div class="card-body">
                     <div class="file-name" title="{{ img.name }}">{{ img.name }}</div>
                     <div class="meta-info"><span>{{ img.size_fmt }}</span><span class="res-tag">...</span></div>
-                    <button class="copy-btn primary" onclick="copyLink(this, '{{ img.raw_url }}')">📋 复制链接</button>
+                    <button class="copy-btn primary" onclick="copyLink(this, '{{ img.raw_url }}')">📋 复制直链</button>
                     <button class="copy-btn" onclick="copyMarkdown(this, '{{ img.name }}', '{{ img.raw_url }}')">📝 复制 Markdown</button>
                 </div>
             </div>
@@ -101,67 +95,102 @@
                 <button class="lb-ctl-btn" onclick="resetZoom()" title="1:1" style="font-size:14px">1:1</button>
                 <button class="lb-ctl-btn" onclick="zoom(0.2)" title="放大">＋</button>
                 <span class="divider"></span>
-                <button class="lb-ctl-btn" onclick="copyCurrentLink()" title="复制直链">🔗</button>
+                <button class="lb-ctl-btn" onclick="copyCurrentLink()" title="复制链接">🔗</button>
             </div>
         </div>
         <div class="filmstrip-container"><div class="filmstrip" id="filmstrip" onclick="event.stopPropagation()"></div></div>
     </div>
 
     <script>
+        // 1. 从后端注入配置 (Token等)
+        const CFG = {
+            token: "{{ config.token }}",
+            repo: "{{ config.repo }}",
+            branch: "{{ config.branch }}",
+            api: "{{ config.api_base }}"
+        };
+
         const galleryData = [
             {% for img in images %}
-            // 🔥 这里是关键修改：我们把 raw_url (即 CDN 链接) 传给了 url 字段
             { name: "{{img.name}}", url: "{{img.raw_url}}", view_url: "{{img.view_url}}" },
             {% endfor %}
         ];
         let curIdx = 0, scale = 1;
 
-        // --- 修正后的上传逻辑 (无压缩) ---
+        // --- 🔥 核心：前端直传 GitHub (突破 Vercel 4.5M 限制) ---
         async function uploadFiles() {
             const inp = document.getElementById('fileInput');
             if (!inp.files.length) return;
             const status = document.getElementById('status');
-            const fd = new FormData();
             
-            // ⚠️ 检查大小提示
-            let hasBigFile = false;
-            for (let f of inp.files) {
-                if (f.size > 4.5 * 1024 * 1024) hasBigFile = true;
-                fd.append('files', f);
-            }
-
-            if(hasBigFile) {
-                if(!confirm("⚠️ 注意：你选择了超过 4.5MB 的图片。\nVercel 可能会拦截上传。\n是否继续尝试？")) {
-                    inp.value = ''; 
-                    return;
-                }
-            }
-
-            status.innerText = `🚀 正在上传 ${inp.files.length} 张原图...`;
+            status.innerText = `🚀 准备直传 ${inp.files.length} 张原图...`;
             
-            try {
-                const res = await fetch('/upload', { method: 'POST', body: fd });
+            let successCount = 0;
+            
+            for (let file of inp.files) {
+                // 生成随机文件名
+                const ext = file.name.substring(file.name.lastIndexOf('.'));
+                const randomName = Math.random().toString(36).substring(2, 6) + (ext || '.jpg');
                 
-                // 处理 Vercel 的 Payload Too Large 错误
-                if (res.status === 413) {
-                    status.innerText = `❌ 上传失败: 图片总大小超过限制 (Vercel限4.5MB)`;
-                    return;
-                }
+                try {
+                    // 1. 转 Base64
+                    const base64Content = await toBase64(file);
+                    const cleanContent = base64Content.split(',')[1]; // 去掉 data:image... 前缀
 
-                const d = await res.json();
-                if(d.status==='success') {
-                    status.innerText = `✅ 上传成功! 刷新中...`;
-                    setTimeout(()=>location.reload(), 1000);
-                } else {
-                    status.innerText = `❌ 失败: ${d.error}`;
+                    // 2. 构造 GitHub API 请求
+                    const url = `${CFG.api}/${randomName}`;
+                    const body = {
+                        message: `Up ${randomName}`,
+                        content: cleanContent,
+                        branch: CFG.branch
+                    };
+
+                    status.innerText = `📤 正在上传: ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)...`;
+
+                    const res = await fetch(url, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${CFG.token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(body)
+                    });
+
+                    if (res.ok) {
+                        successCount++;
+                    } else {
+                        const errText = await res.text();
+                        console.error(errText);
+                        status.innerText = `❌ 上传失败: ${res.status}`;
+                        // 失败稍微停顿一下
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                } catch (e) {
+                    status.innerText = `❌ 错误: ${e.message}`;
                 }
-            } catch(e) {
-                status.innerText = `❌ 网络异常: ${e.message}`;
+            }
+
+            if (successCount > 0) {
+                status.innerText = `✅ 全部搞定！成功上传 ${successCount} 张，刷新中...`;
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                status.innerText = "⚠️ 上传完成，但似乎都失败了";
             }
         }
 
+        // 辅助：文件转 Base64
+        function toBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        // --- 其他交互逻辑保持不变 ---
         async function deleteImage(name, idx) {
-            if(!confirm('确定删除?')) return;
+            if(!confirm('删除？')) return;
             const fd = new FormData(); fd.append('filename', name);
             const res = await fetch('/delete', { method: 'POST', body: fd });
             if ((await res.json()).status === 'success') document.getElementById('card-'+idx).remove();
@@ -186,7 +215,7 @@
         function showImage(idx) {
             curIdx = idx; scale = 1;
             const img = document.getElementById('lb-img');
-            img.src = galleryData[idx].url; // 这里使用的是 CDN 直链
+            img.src = galleryData[idx].url;
             img.style.transform = `scale(1)`;
             document.querySelectorAll('.thumb').forEach((t, i) => {
                 t.className = `thumb ${i===idx?'active':''}`;
@@ -201,10 +230,7 @@
         }
         function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
         function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
-        
-        // 🔥 关键修正：预览时点击复制，现在复制的是 url (CDN直链) 而不是 view_url
         function copyCurrentLink() { copyLink(null, galleryData[curIdx].url); alert('直链已复制'); }
-        
         function updateRes(img) { if(img.naturalWidth) img.closest('.card').querySelector('.res-tag').innerText = img.naturalWidth+'x'+img.naturalHeight; }
         function copyLink(btn, txt) { navigator.clipboard.writeText(txt); if(btn){let t=btn.innerText;btn.innerText='✅';setTimeout(()=>btn.innerText=t,1500);} }
         function copyMarkdown(btn, n, u) { copyLink(btn, `![${n}](${u})`); }
