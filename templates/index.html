@@ -20,6 +20,18 @@
         .btn:hover { background: var(--primary); color: white; }
         #fileInput { display: none; }
         #status { margin-top: 15px; color: #666; font-size: 14px; word-break: break-all; }
+        
+        /* 🔥 修复刷新按钮位置: Flex 布局撑满两端 */
+        .gallery-header { 
+            display: flex; 
+            justify-content: space-between; /* 一左一右 */
+            align-items: center; 
+            margin-bottom: 20px; 
+            width: 100%; 
+        }
+        .refresh-btn { background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; display: flex; align-items: center; gap: 5px; }
+        .refresh-btn:hover { color: var(--primary); }
+        
         .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
         .card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; transition: 0.2s; }
         .card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
@@ -102,7 +114,6 @@
     </div>
 
     <script>
-        // 1. 从后端注入配置 (Token等)
         const CFG = {
             token: "{{ config.token }}",
             repo: "{{ config.repo }}",
@@ -117,27 +128,24 @@
         ];
         let curIdx = 0, scale = 1;
 
-        // --- 🔥 核心：前端直传 GitHub (突破 Vercel 4.5M 限制) ---
         async function uploadFiles() {
             const inp = document.getElementById('fileInput');
             if (!inp.files.length) return;
             const status = document.getElementById('status');
-            
             status.innerText = `🚀 准备直传 ${inp.files.length} 张原图...`;
             
             let successCount = 0;
             
             for (let file of inp.files) {
-                // 生成随机文件名
+                // 🔥 修改点：去掉时间戳，只用随机码
+                // 这样文件名干净，但GitHub会按字母排序，无法保证"最新在前"
                 const ext = file.name.substring(file.name.lastIndexOf('.'));
-                const randomName = Math.random().toString(36).substring(2, 6) + (ext || '.jpg');
+                const randomName = Math.random().toString(36).substring(2, 8) + (ext || '.jpg');
                 
                 try {
-                    // 1. 转 Base64
                     const base64Content = await toBase64(file);
-                    const cleanContent = base64Content.split(',')[1]; // 去掉 data:image... 前缀
+                    const cleanContent = base64Content.split(',')[1]; 
 
-                    // 2. 构造 GitHub API 请求
                     const url = `${CFG.api}/${randomName}`;
                     const body = {
                         message: `Up ${randomName}`,
@@ -159,10 +167,7 @@
                     if (res.ok) {
                         successCount++;
                     } else {
-                        const errText = await res.text();
-                        console.error(errText);
                         status.innerText = `❌ 上传失败: ${res.status}`;
-                        // 失败稍微停顿一下
                         await new Promise(r => setTimeout(r, 1000));
                     }
                 } catch (e) {
@@ -173,12 +178,9 @@
             if (successCount > 0) {
                 status.innerText = `✅ 全部搞定！成功上传 ${successCount} 张，刷新中...`;
                 setTimeout(() => location.reload(), 1500);
-            } else {
-                status.innerText = "⚠️ 上传完成，但似乎都失败了";
             }
         }
 
-        // 辅助：文件转 Base64
         function toBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -188,7 +190,6 @@
             });
         }
 
-        // --- 其他交互逻辑保持不变 ---
         async function deleteImage(name, idx) {
             if(!confirm('删除？')) return;
             const fd = new FormData(); fd.append('filename', name);
