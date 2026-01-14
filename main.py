@@ -1,35 +1,37 @@
 import os
-import time
 import uuid
 import datetime
+import base64
 import requests
 from functools import wraps
-from flask import Flask, request, jsonify, render_template_string, redirect, session, url_for, Response
+from flask import Flask, request, jsonify, render_template_string, redirect, session, url_for
 from flask_cors import CORS
-from huggingface_hub import HfApi, CommitOperationDelete
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 CORS(app)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-app.secret_key = "my-fixed-secret-key-2026"
+
+# --- 配置区域 ---
+app.secret_key = os.environ.get("SECRET_KEY", "my-fixed-secret-key-2026")
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_SAMESITE='None',
     PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30)
 )
 
-HF_TOKEN = os.environ.get("HF_TOKEN")
-DATASET_NAME = os.environ.get("DATASET_NAME")
-SPACE_HOST = os.environ.get("SPACE_HOST", "localhost:7860")
-BASE_URL = f"https://{SPACE_HOST}" if "localhost" not in SPACE_HOST else f"http://{SPACE_HOST}"
+# 环境变量 (改为 GitHub 配置)
 ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")        # 必须: ghp_xxxx
+GITHUB_REPO = os.environ.get("GITHUB_REPO")          # 必须: 用户名/仓库名
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "main") # 可选: 默认 main
 
-if HF_TOKEN: api = HfApi(token=HF_TOKEN)
-CACHE_DIR = "/app/cache"
-if not os.path.exists(CACHE_DIR): os.makedirs(CACHE_DIR)
+# GitHub API & CDN 基础地址
+GITHUB_API_BASE = f"https://api.github.com/repos/{GITHUB_REPO}/contents"
+CDN_BASE = f"https://cdn.jsdelivr.net/gh/{GITHUB_REPO}@{GITHUB_BRANCH}"
 
+# 辅助函数：格式化大小
 def format_size(size):
     if size is None: return "未知"
     for unit in ['B', 'KB', 'MB', 'GB']:
@@ -37,6 +39,7 @@ def format_size(size):
         size /= 1024
     return f"{size:.1f} TB"
 
+# 登录验证装饰器
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -45,22 +48,24 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# 1. 登录页面
-LOGIN_TEMPLATE = """<!DOCTYPE html><html><head><title>登录</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;height:100vh;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;background:url('https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;background-size:cover}.glass-box{width:300px;padding:40px 30px;text-align:center;background:rgba(255,255,255,0.1);backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);border-radius:24px;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 32px 0 rgba(0,0,0,0.1);color:white}h2{margin:0 0 25px 0;font-weight:500}input{width:100%;padding:14px;margin:10px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;outline:none;transition:0.3s;box-sizing:border-box}input:focus{background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.8)}button{width:100%;padding:14px;margin-top:20px;background:rgba(255,255,255,0.9);color:#333;border:none;border-radius:12px;font-weight:bold;cursor:pointer;transition:0.3s}button:hover{background:white;transform:translateY(-2px)}.err{color:#ffcccc;background:rgba(255,0,0,0.2);padding:5px;border-radius:5px;font-size:14px;margin-bottom:10px}</style></head><body><div class="glass-box"><h2>CloudGallery</h2>{% if error %}<div class="err">{{ error }}</div>{% endif %}<form method="post"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button type="submit">Sign In</button></form></div></body></html>"""
+# =========================================================
+# 📝 模板区域 (保持原汁原味)
+# =========================================================
 
-# 2. 全屏查看 (备用)
+# 1. 登录页面 (未修改)
+LOGIN_TEMPLATE = """<!DOCTYPE html><html><head><title>登录</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;height:100vh;display:flex;justify-content:center;align-items:center;font-family:-apple-system,sans-serif;background:url('https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center fixed;background-size:cover}.glass-box{width:300px;padding:40px 30px;text-align:center;background:rgba(255,255,255,0.1);backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);border-radius:24px;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 32px 0 rgba(0,0,0,0.1);color:white}h2{margin:0 0 25px 0;font-weight:500}input{width:100%;padding:14px;margin:10px 0;border-radius:12px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:white;outline:none;transition:0.3s;box-sizing:border-box}input:focus{background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.8)}button{width:100%;padding:14px;margin-top:20px;background:rgba(255,255,255,0.9);color:#333;border:none;border-radius:12px;font-weight:bold;cursor:pointer;transition:0.3s}button:hover{background:white;transform:translateY(-2px)}.err{color:#ffcccc;background:rgba(255,0,0,0.2);padding:5px;border-radius:5px;font-size:14px;margin-bottom:10px}</style></head><body><div class="glass-box"><h2>GitHub Gallery</h2>{% if error %}<div class="err">{{ error }}</div>{% endif %}<form method="post"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button type="submit">Sign In</button></form></div></body></html>"""
+
+# 2. 全屏查看 (微调 URL)
 VIEW_TEMPLATE = """<!DOCTYPE html><html><head><title>查看</title><style>body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden}img{width:100%;height:100%;object-fit:contain}</style></head><body><img src="{{ real_url }}"></body></html>"""
 
-# =========================================================
-# 🎨 3. 主页模板 (V11.0 纯净白透版)
-# =========================================================
+# 3. 主页模板 (V11.0 纯净白透版 - 你的原始代码)
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的图床</title>
+    <title>我的图床 (GitHub版)</title>
     <style>
         * { box-sizing: border-box; }
         :root { --primary: #3b82f6; --bg: #f8fafc; }
@@ -188,7 +193,7 @@ HTML_TEMPLATE = """
     <div class="container">
         <div class="top-nav"><a href="/logout" class="logout-btn">🔴 退出</a></div>
         <div class="upload-section">
-            <h2 style="margin-top:0;">☁️ CloudGallery</h2>
+            <h2 style="margin-top:0;">☁️ CloudGallery (GitHub)</h2>
             <div class="upload-wrapper">
                 <button class="btn">＋ 上传图片 (多选)</button>
                 <input type="file" id="fileInput" accept="image/*" multiple onchange="handleUpload()">
@@ -196,7 +201,7 @@ HTML_TEMPLATE = """
             <div id="status">准备就绪</div>
         </div>
         <div class="gallery-header">
-            <h3 style="margin:0">🖼️ 图片列表</h3>
+            <h3 style="margin:0">🖼️ 图片列表 ({{ images|length }})</h3>
             <button class="refresh-btn" onclick="location.reload()">🔄 刷新</button>
         </div>
         <div class="gallery-grid">
@@ -219,11 +224,9 @@ HTML_TEMPLATE = """
 
     <div id="lightbox" class="lightbox-overlay" onclick="closeViewer(event)">
         <div class="floating-close" onclick="closeViewer()">×</div>
-        
         <div class="lb-main">
             <img id="lb-img" class="lb-img" onclick="event.stopPropagation()">
         </div>
-
         <div class="lb-bottom-container">
             <div class="lb-controls" onclick="event.stopPropagation()">
                 <button class="lb-ctl-btn" onclick="zoom(-0.2)" title="缩小">－</button>
@@ -233,7 +236,6 @@ HTML_TEMPLATE = """
                 <button class="lb-ctl-btn" onclick="copyCurrentLink()" title="复制链接">🔗</button>
             </div>
         </div>
-
         <div class="filmstrip-container">
             <div class="filmstrip" id="filmstrip" onclick="event.stopPropagation()"></div>
         </div>
@@ -256,17 +258,29 @@ HTML_TEMPLATE = """
             try {
                 const res = await fetch('/upload', { method: 'POST', body: fd });
                 const d = await res.json();
-                if(d.status==='success') setTimeout(()=>location.reload(), 1000);
-            } catch(e) {}
+                if(d.status==='success') {
+                    document.getElementById('status').innerText = `✅ 成功! 刷新中...`;
+                    setTimeout(()=>location.reload(), 1000);
+                } else {
+                    document.getElementById('status').innerText = `❌ 失败: ${d.error || '未知错误'}`;
+                }
+            } catch(e) {
+                document.getElementById('status').innerText = `❌ 网络错误`;
+            }
         }
 
         async function deleteImage(name, idx) {
-            if(!confirm('删除？')) return;
+            if(!confirm('确定要删除 ' + name + ' 吗？')) return;
             const fd = new FormData(); fd.append('filename', name);
-            const res = await fetch('/delete', { method: 'POST', body: fd });
-            if ((await res.json()).status === 'success') document.getElementById('card-'+idx).remove();
+            try {
+                const res = await fetch('/delete', { method: 'POST', body: fd });
+                const d = await res.json();
+                if (d.status === 'success') document.getElementById('card-'+idx).remove();
+                else alert('删除失败: ' + (d.error || '未知原因'));
+            } catch(e) { alert('网络错误'); }
         }
 
+        // 下面的 Lightbox 逻辑保持不变
         function openViewer(idx) {
             curIdx = idx;
             const lb = document.getElementById('lightbox');
@@ -301,7 +315,7 @@ HTML_TEMPLATE = """
         }
         function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
         function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
-        function copyCurrentLink() { copyLink(null, galleryData[curIdx].view_url); alert('已复制'); }
+        function copyCurrentLink() { copyLink(null, galleryData[curIdx].url); alert('链接已复制'); }
         function updateRes(img) { if(img.naturalWidth) img.closest('.card').querySelector('.res-tag').innerText = img.naturalWidth+'x'+img.naturalHeight; }
         function copyLink(btn, txt) { navigator.clipboard.writeText(txt); if(btn){let t=btn.innerText;btn.innerText='✅';setTimeout(()=>btn.innerText=t,1500);} }
         function copyMarkdown(btn, n, u) { copyLink(btn, `![${n}](${u})`); }
@@ -313,6 +327,10 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
+
+# =========================================================
+# 🚀 核心后端逻辑 (GitHub 版)
+# =========================================================
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -328,63 +346,126 @@ def logout(): session.pop('logged_in', None); return redirect('/login')
 @app.route('/')
 @login_required
 def home():
-    if not HF_TOKEN: return "Missing Env"
+    if not GITHUB_TOKEN or not GITHUB_REPO: return "Missing GITHUB Environment Variables"
     try:
-        tree = api.list_repo_tree(repo_id=DATASET_NAME, repo_type="dataset", token=HF_TOKEN, recursive=False)
+        # 1. 调用 GitHub API 获取文件列表
+        headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+        # 使用 params 避免缓存
+        r = requests.get(f"{GITHUB_API_BASE}?ref={GITHUB_BRANCH}", headers=headers)
+        
+        if r.status_code != 200:
+            return f"GitHub API Error: {r.text}"
+            
+        files_data = r.json()
         images = []
-        for item in tree:
-            if item.path.lower().endswith(('.png','.jpg','.jpeg','.gif','.webp','.bmp')):
-                raw_url = f"{BASE_URL}/file/{item.path}"
-                images.append({
-                    "name": item.path,
-                    "raw_url": raw_url,
-                    "real_url": f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/{item.path}",
-                    "view_url": f"{BASE_URL}/view/{item.path}",
-                    "size_fmt": format_size(item.size) if hasattr(item, 'size') else "?"
-                })
-        images.reverse()
-        return render_template_string(HTML_TEMPLATE, images=images, dataset_name=DATASET_NAME)
-    except: return "Error loading images"
+        
+        # 2. 过滤图片并构造对象
+        if isinstance(files_data, list):
+            for item in files_data:
+                if item['type'] == 'file' and item['name'].lower().endswith(('.png','.jpg','.jpeg','.gif','.webp','.bmp')):
+                    # 直接构造 jsDelivr 链接
+                    raw_url = f"{CDN_BASE}/{item['name']}"
+                    images.append({
+                        "name": item['name'],
+                        "raw_url": raw_url,
+                        # 查看页也直接用 CDN 链接
+                        "view_url": f"/view/{item['name']}", 
+                        "real_url": raw_url,
+                        "size_fmt": format_size(item['size'])
+                    })
+        
+        # GitHub 返回是按名称排序的，如果你的文件名是随机字符，这里反转也没法按时间排
+        # 但如果是顺序文件名，反转就是最新的在前面
+        images.reverse() 
+        return render_template_string(HTML_TEMPLATE, images=images)
+    except Exception as e:
+        return f"Error loading images: {str(e)}"
 
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload_file():
+    if 'files' not in request.files:
+        return jsonify({"error": "No files part"}), 400
+        
     files = request.files.getlist('files')
     count = 0
+    errors = []
+    
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    
     for file in files:
         if not file.filename: continue
-        # 核心修改：使用 4 位随机字符
+        
+        # 生成 4 位随机文件名 (保留原有逻辑)
         ext = os.path.splitext(file.filename)[1].lower()
         if not ext: ext = ".jpg"
         name = f"{uuid.uuid4().hex[:4]}{ext}"
         
-        path = os.path.join(CACHE_DIR, name)
         try:
-            file.save(path)
-            api.upload_file(path_or_fileobj=path, path_in_repo=name, repo_id=DATASET_NAME, repo_type="dataset", token=HF_TOKEN)
-            os.remove(path)
-            count += 1
-        except: pass
-    return jsonify({"status": "success", "count": count})
+            # 1. 读取文件并转 Base64
+            file_content = base64.b64encode(file.read()).decode('utf-8')
+            
+            # 2. 推送到 GitHub
+            url = f"{GITHUB_API_BASE}/{name}"
+            data = {
+                "message": f"Upload {name}",
+                "content": file_content,
+                "branch": GITHUB_BRANCH
+            }
+            
+            r = requests.put(url, json=data, headers=headers)
+            if r.status_code in [200, 201]:
+                count += 1
+            else:
+                errors.append(f"{file.filename}: {r.status_code}")
+                
+        except Exception as e:
+            errors.append(f"{file.filename}: {str(e)}")
+            
+    if count > 0:
+        return jsonify({"status": "success", "count": count})
+    else:
+        return jsonify({"status": "error", "error": str(errors)})
 
 @app.route('/delete', methods=['POST'])
 @login_required
 def delete_file():
     name = request.form.get('filename')
+    if not name: return jsonify({"error": "Missing filename"})
+    
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    url = f"{GITHUB_API_BASE}/{name}"
+    
     try:
-        api.create_commit(repo_id=DATASET_NAME, repo_type="dataset", operations=[CommitOperationDelete(path_in_repo=name)], commit_message=f"Del {name}")
-        return jsonify({"status": "success"})
-    except Exception as e: return jsonify({"error": str(e)})
+        # 1. 获取文件的 SHA (GitHub 删除文件必须提供 SHA)
+        # 加上 ref 参数确保获取对应分支
+        r_get = requests.get(f"{url}?ref={GITHUB_BRANCH}", headers=headers)
+        if r_get.status_code != 200:
+            return jsonify({"error": "File not found or GitHub API error"})
+            
+        sha = r_get.json()['sha']
+        
+        # 2. 发送删除请求
+        data = {
+            "message": f"Delete {name}",
+            "sha": sha,
+            "branch": GITHUB_BRANCH
+        }
+        r_del = requests.delete(url, json=data, headers=headers)
+        
+        if r_del.status_code == 200:
+            return jsonify({"status": "success"})
+        else:
+            return jsonify({"error": f"Delete failed: {r_del.text}"})
+            
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @app.route('/view/<path:filename>')
 def view_image(filename):
-    return render_template_string(VIEW_TEMPLATE, real_url=f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/{filename}")
+    # 直接使用 CDN 链接显示大图
+    real_url = f"{CDN_BASE}/{filename}"
+    return render_template_string(VIEW_TEMPLATE, real_url=real_url)
 
-@app.route('/file/<path:filename>')
-def get_image_file(filename):
-    url = f"https://huggingface.co/datasets/{DATASET_NAME}/resolve/main/{filename}"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    r = requests.get(url, headers=headers, stream=True)
-    return Response(r.iter_content(chunk_size=1024), content_type=r.headers.get('Content-Type'))
-
-if __name__ == '__main__': app.run(host='0.0.0.0', port=7860)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=7860)
