@@ -1,7 +1,5 @@
 import os
-import uuid
 import datetime
-import base64
 import requests
 import tempfile
 from functools import wraps
@@ -11,7 +9,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# --- 配置区域 ---
+# 配置
 app.secret_key = os.environ.get("SECRET_KEY", "my-fixed-secret-key-2026")
 app.config.update(
     SESSION_COOKIE_SECURE=True,
@@ -19,18 +17,15 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=30)
 )
 
-# 环境变量读取
+# 环境变量
 ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")
-GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH") 
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH")
 
-# 这里的逻辑已经修正，确保分支名正确
 GITHUB_API_BASE = f"https://api.github.com/repos/{GITHUB_REPO}/contents"
-# CDN 链接拼接
 CDN_BASE = f"https://cdn.jsdelivr.net/gh/{GITHUB_REPO}"
-CACHE_DIR = tempfile.gettempdir()
 
 def format_size(size):
     if size is None: return "未知"
@@ -47,7 +42,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# ================= 路由逻辑 =================
+# ================= 路由 =================
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -66,11 +61,10 @@ def home():
     if not GITHUB_TOKEN or not GITHUB_REPO: return "错误: 环境变量未设置"
     try:
         headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-        # 加时间戳防止缓存
+        # 获取列表
         r = requests.get(f"{GITHUB_API_BASE}?ref={GITHUB_BRANCH}&t={datetime.datetime.now().timestamp()}", headers=headers)
         
-        if r.status_code != 200: 
-            return f"连接 GitHub 失败: {r.status_code} <br> {r.text}"
+        if r.status_code != 200: return f"连接 GitHub 失败: {r.status_code} <br> {r.text}"
             
         files_data = r.json()
         images = []
@@ -81,40 +75,28 @@ def home():
                     images.append({
                         "name": item['name'],
                         "raw_url": raw_url,
-                        # view_url 用于网页预览，但复制时我们用 raw_url
                         "view_url": f"/view/{item['name']}",
                         "size_fmt": format_size(item['size'])
                     })
         images.reverse()
-        return render_template('index.html', images=images)
+        
+        # 🔥 关键修改：把配置传递给前端，让前端直接上传
+        config = {
+            "token": GITHUB_TOKEN,
+            "repo": GITHUB_REPO,
+            "branch": GITHUB_BRANCH,
+            "api_base": GITHUB_API_BASE
+        }
+        return render_template('index.html', images=images, config=config)
+        
     except Exception as e: return f"System Error: {str(e)}"
 
-@app.route('/upload', methods=['POST'])
-@login_required
-def upload_file():
-    files = request.files.getlist('files')
-    count = 0
-    errors = []
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    
-    for file in files:
-        if not file.filename: continue
-        ext = os.path.splitext(file.filename)[1].lower() or ".jpg"
-        name = f"{uuid.uuid4().hex[:4]}{ext}"
-        try:
-            file_content = base64.b64encode(file.read()).decode('utf-8')
-            data = {"message": f"Up {name}", "content": file_content, "branch": GITHUB_BRANCH}
-            r = requests.put(f"{GITHUB_API_BASE}/{name}", json=data, headers=headers)
-            if r.status_code in [200, 201]: count += 1
-            else: errors.append(f"{file.filename}: {r.status_code}")
-        except Exception as e: errors.append(str(e))
-    
-    if count > 0: return jsonify({"status": "success", "count": count})
-    else: return jsonify({"status": "error", "error": str(errors)})
+# /upload 路由已删除，改为前端直传
 
 @app.route('/delete', methods=['POST'])
 @login_required
 def delete_file():
+    # 删除比较轻量，依然走后端代理，比较安全
     name = request.form.get('filename')
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     try:
@@ -129,7 +111,6 @@ def delete_file():
 @app.route('/view/<path:filename>')
 def view_image(filename):
     real_url = f"{CDN_BASE}/{filename}"
-    # 简单的全屏预览页
     return f'<html><body style="margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh"><img src="{real_url}" style="max-width:100%;max-height:100%"></body></html>'
 
 if __name__ == '__main__':
