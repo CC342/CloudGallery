@@ -15,22 +15,30 @@
         .container { max-width: 1200px; margin: 0 auto; }
         .top-nav { display: flex; justify-content: flex-end; margin-bottom: 10px; }
         .logout-btn { text-decoration: none; color: #ef4444; font-size: 13px; padding: 6px 12px; background: white; border: 1px solid #fee2e2; border-radius: 20px; transition: 0.2s; }
+        
         .upload-section { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; margin-bottom: 30px; margin-top: 10px; }
         .btn { background: white; border: 2px solid var(--primary); color: var(--primary); padding: 10px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn:hover { background: var(--primary); color: white; }
         #fileInput { display: none; }
         #status { margin-top: 15px; color: #666; font-size: 14px; word-break: break-all; }
         
-        /* 🔥 修复刷新按钮位置: Flex 布局撑满两端 */
+        /* 🔥 彻底修复：Flex 布局，两端对齐 */
         .gallery-header { 
             display: flex; 
-            justify-content: space-between; /* 一左一右 */
+            justify-content: space-between; /* 关键：一左一右 */
             align-items: center; 
             margin-bottom: 20px; 
-            width: 100%; 
+            width: 100%;
         }
-        .refresh-btn { background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; display: flex; align-items: center; gap: 5px; }
-        .refresh-btn:hover { color: var(--primary); }
+        /* 左侧标题容器 */
+        .header-title { margin: 0; }
+        
+        .refresh-btn { 
+            background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; 
+            display: flex; align-items: center; gap: 5px; 
+            padding: 8px 12px; border-radius: 6px;
+        }
+        .refresh-btn:hover { background: #f1f5f9; color: var(--primary); }
         
         .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
         .card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; transition: 0.2s; }
@@ -69,17 +77,19 @@
     <div class="container">
         <div class="top-nav"><a href="/logout" class="logout-btn">🔴 退出</a></div>
         <div class="upload-section">
-            <h2 style="margin-top:0;">☁️ CloudGallery (VIP 直传)</h2>
+            <h2 style="margin-top:0;">☁️ CloudGallery (代理加速版)</h2>
             <div class="upload-wrapper">
-                <button class="btn" onclick="document.getElementById('fileInput').click()">＋ 上传原图 (无限大小)</button>
+                <button class="btn" onclick="document.getElementById('fileInput').click()">＋ 上传原图</button>
                 <input type="file" id="fileInput" accept="image/*" multiple onchange="uploadFiles()">
             </div>
             <div id="status">准备就绪</div>
         </div>
+        
         <div class="gallery-header">
-            <h3 style="margin:0">🖼️ 图片列表</h3>
+            <h3 class="header-title">🖼️ 图片列表</h3>
             <button class="refresh-btn" onclick="location.reload()">🔄 刷新</button>
         </div>
+        
         <div class="gallery-grid">
             {% for img in images %}
             <div class="card" id="card-{{ loop.index0 }}">
@@ -89,9 +99,9 @@
                 <button class="delete-btn" onclick="deleteImage('{{ img.name }}', {{ loop.index0 }})">×</button>
                 <div class="card-body">
                     <div class="file-name" title="{{ img.name }}">{{ img.name }}</div>
-                    <div class="meta-info"><span>{{ img.size_fmt }}</span><span class="res-tag">...</span></div>
-                    <button class="copy-btn primary" onclick="copyLink(this, '{{ img.raw_url }}')">📋 复制直链</button>
-                    <button class="copy-btn" onclick="copyMarkdown(this, '{{ img.name }}', '{{ img.raw_url }}')">📝 复制 Markdown</button>
+                    <div class="meta-info"><span>{{ img.size_fmt }}</span><span>🚀</span></div>
+                    <button class="copy-btn primary" onclick="copyFullLink('{{ img.raw_url }}')">📋 复制直链</button>
+                    <button class="copy-btn" onclick="copyMarkdown('{{ img.name }}', '{{ img.raw_url }}')">📝 复制 Markdown</button>
                 </div>
             </div>
             {% endfor %}
@@ -107,7 +117,7 @@
                 <button class="lb-ctl-btn" onclick="resetZoom()" title="1:1" style="font-size:14px">1:1</button>
                 <button class="lb-ctl-btn" onclick="zoom(0.2)" title="放大">＋</button>
                 <span class="divider"></span>
-                <button class="lb-ctl-btn" onclick="copyCurrentLink()" title="复制链接">🔗</button>
+                <button class="lb-ctl-btn" onclick="copyCurrentLink()" title="复制直链">🔗</button>
             </div>
         </div>
         <div class="filmstrip-container"><div class="filmstrip" id="filmstrip" onclick="event.stopPropagation()"></div></div>
@@ -132,20 +142,18 @@
             const inp = document.getElementById('fileInput');
             if (!inp.files.length) return;
             const status = document.getElementById('status');
-            status.innerText = `🚀 准备直传 ${inp.files.length} 张原图...`;
+            status.innerText = `🚀 准备上传 ${inp.files.length} 张原图...`;
             
             let successCount = 0;
             
             for (let file of inp.files) {
-                // 🔥 修改点：去掉时间戳，只用随机码
-                // 这样文件名干净，但GitHub会按字母排序，无法保证"最新在前"
+                // 不带时间戳的文件名
                 const ext = file.name.substring(file.name.lastIndexOf('.'));
                 const randomName = Math.random().toString(36).substring(2, 8) + (ext || '.jpg');
                 
                 try {
                     const base64Content = await toBase64(file);
                     const cleanContent = base64Content.split(',')[1]; 
-
                     const url = `${CFG.api}/${randomName}`;
                     const body = {
                         message: `Up ${randomName}`,
@@ -153,30 +161,23 @@
                         branch: CFG.branch
                     };
 
-                    status.innerText = `📤 正在上传: ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)...`;
-
+                    status.innerText = `📤 正在上传: ${file.name}...`;
                     const res = await fetch(url, {
                         method: 'PUT',
-                        headers: {
-                            'Authorization': `token ${CFG.token}`,
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { 'Authorization': `token ${CFG.token}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify(body)
                     });
 
-                    if (res.ok) {
-                        successCount++;
-                    } else {
-                        status.innerText = `❌ 上传失败: ${res.status}`;
+                    if (res.ok) successCount++;
+                    else {
+                        status.innerText = `❌ 失败: ${res.status}`;
                         await new Promise(r => setTimeout(r, 1000));
                     }
-                } catch (e) {
-                    status.innerText = `❌ 错误: ${e.message}`;
-                }
+                } catch (e) { status.innerText = `❌ 错误: ${e.message}`; }
             }
 
             if (successCount > 0) {
-                status.innerText = `✅ 全部搞定！成功上传 ${successCount} 张，刷新中...`;
+                status.innerText = `✅ 成功上传 ${successCount} 张，刷新中...`;
                 setTimeout(() => location.reload(), 1500);
             }
         }
@@ -231,10 +232,25 @@
         }
         function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
         function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
-        function copyCurrentLink() { copyLink(null, galleryData[curIdx].url); alert('直链已复制'); }
+        
+        // 🔥 核心修改：复制时自动补全当前域名
+        function getFullUrl(path) {
+            return window.location.origin + path;
+        }
+
+        function copyFullLink(path) { 
+            copyLink(null, getFullUrl(path)); 
+            alert('已复制直链：\n' + getFullUrl(path)); 
+        }
+        
+        function copyCurrentLink() { 
+            copyLink(null, getFullUrl(galleryData[curIdx].url)); 
+            alert('已复制'); 
+        }
+
         function updateRes(img) { if(img.naturalWidth) img.closest('.card').querySelector('.res-tag').innerText = img.naturalWidth+'x'+img.naturalHeight; }
         function copyLink(btn, txt) { navigator.clipboard.writeText(txt); if(btn){let t=btn.innerText;btn.innerText='✅';setTimeout(()=>btn.innerText=t,1500);} }
-        function copyMarkdown(btn, n, u) { copyLink(btn, `![${n}](${u})`); }
+        function copyMarkdown(btn, n, p) { copyLink(btn, `![${n}](${getFullUrl(p)})`); }
         
         document.getElementById('lb-img').addEventListener('wheel', function(e) {
             e.preventDefault(); e.deltaY < 0 ? zoom(0.1) : zoom(-0.1);
