@@ -26,7 +26,7 @@ GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")
 
 # 👇 重点检查这里：默认值设为了 vercel
-GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "vercel") 
+GITHUB_BRANCH =  "vercel"
 
 GITHUB_API_BASE = f"https://api.github.com/repos/{GITHUB_REPO}/contents"
 CDN_BASE = f"https://cdn.jsdelivr.net/gh/{GITHUB_REPO}@{GITHUB_BRANCH}"
