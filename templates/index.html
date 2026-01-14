@@ -231,7 +231,7 @@
         }
         function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
         function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
-        function copyCurrentLink() { copyLink(null, galleryData[curIdx].url); alert('直链已复制'); }
+        function copyCurrentLink() { copyLink(null, galleryData[curIdx].url); alert('已复制'); }
         function updateRes(img) { if(img.naturalWidth) img.closest('.card').querySelector('.res-tag').innerText = img.naturalWidth+'x'+img.naturalHeight; }
         function copyLink(btn, txt) { navigator.clipboard.writeText(txt); if(btn){let t=btn.innerText;btn.innerText='✅';setTimeout(()=>btn.innerText=t,1500);} }
         function copyMarkdown(btn, n, u) { copyLink(btn, `![${n}](${u})`); }
