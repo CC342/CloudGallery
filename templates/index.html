@@ -23,7 +23,7 @@
         #fileInput { display: none; }
         #status { margin-top: 15px; color: #666; font-size: 14px; word-break: break-all; }
         
-        /* 头部布局：两端对齐 */
+        /* 头部布局 */
         .gallery-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; width: 100%; }
         .header-title { margin: 0; }
         .refresh-btn { background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; display: flex; align-items: center; gap: 5px; padding: 8px 12px; border-radius: 6px; }
@@ -119,6 +119,7 @@
     </div>
 
     <script>
+        // CFG.api_base 现在包含了 /images
         const CFG = {
             token: "{{ config.token }}",
             repo: "{{ config.repo }}",
@@ -181,7 +182,7 @@
                     const blob = await res.blob();
                     const objectUrl = URL.createObjectURL(blob);
                     
-                    // 🔥 修复点2：图片加载完成后，设置 src 并触发 updateRes 更新分辨率
+                    // 图片加载完后更新分辨率
                     imgObj.onload = () => updateRes(imgObj);
                     imgObj.src = objectUrl;
                     imgObj.style.opacity = '1';
@@ -208,7 +209,9 @@
                     const base64Content = await toBase64(file);
                     const cleanContent = base64Content.split(',')[1]; 
                     
+                    // CFG.api 已经指向 /images 文件夹，所以这里直接拼接文件名即可
                     const url = `${CFG.api}/${randomName}`;
+                    
                     const body = {
                         message: `Up ${randomName}`,
                         content: cleanContent,
@@ -253,6 +256,7 @@
         }
 
         async function deleteImage(name, idx) {
+            // 直接删除，不弹窗
             const fd = new FormData(); fd.append('filename', name);
             const res = await fetch('/delete', { method: 'POST', body: fd });
             if ((await res.json()).status === 'success') document.getElementById('card-'+idx).remove();
@@ -294,8 +298,6 @@
         }
         function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
         function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
-        
-        // 分辨率更新辅助函数
         function updateRes(img) { if(img.naturalWidth) img.closest('.card').querySelector('.res-tag').innerText = img.naturalWidth+'x'+img.naturalHeight; }
         
         document.getElementById('lb-img').addEventListener('wheel', function(e) {
