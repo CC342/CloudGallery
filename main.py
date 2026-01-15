@@ -22,7 +22,7 @@ ADMIN_USER = os.environ.get("ADMIN_USER")
 ADMIN_PASS = os.environ.get("ADMIN_PASS")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")
-GITHUB_BRANCH = "main"
+GITHUB_BRANCH = "vercel"
 
 # 🔥 新增：定义图片存放的文件夹名称
 GITHUB_FOLDER = "images"
