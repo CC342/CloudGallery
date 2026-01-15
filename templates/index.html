@@ -199,7 +199,6 @@
         function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
         function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
         
-        // 🔥 核心修复：链接补全 + 打勾动画
         
         // 1. 自动补全域名 (适配代理)
         function getFullUrl(path) {
