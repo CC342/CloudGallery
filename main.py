@@ -3,7 +3,7 @@ import datetime
 import requests
 import tempfile
 from functools import wraps
-from flask import Flask, request, jsonify, render_template, redirect, session, url_for
+from flask import Flask, request, jsonify, render_template, redirect, session, url_for, render_template_string
 from flask_cors import CORS
 
 app = Flask(__name__)
