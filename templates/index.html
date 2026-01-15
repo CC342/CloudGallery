@@ -20,11 +20,12 @@
         .upload-section { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; margin-bottom: 30px; margin-top: 10px; }
         .btn { background: white; border: 2px solid var(--primary); color: var(--primary); padding: 10px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn:hover { background: var(--primary); color: white; }
-        .upload-wrapper input { position: absolute; left: 0; top: 0; font-size: 100px; opacity: 0; cursor: pointer; }
+        #fileInput { display: none; }
         #status { margin-top: 15px; color: #666; font-size: 14px; word-break: break-all; }
         
         /* 头部布局：两端对齐 */
         .gallery-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; width: 100%; }
+        .header-title { margin: 0; }
         .refresh-btn { background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; display: flex; align-items: center; gap: 5px; padding: 8px 12px; border-radius: 6px; }
         .refresh-btn:hover { background: #f1f5f9; color: var(--primary); }
         
@@ -68,9 +69,9 @@
     <div class="container">
         <div class="top-nav"><a href="/logout" class="logout-btn">🔴 退出</a></div>
         <div class="upload-section">
-            <h2 style="margin-top:0;">☁️ CloudGallery (VIP 直传)</h2>
+            <h2 style="margin-top:0;">☁️ CloudGallery</h2>
             <div class="upload-wrapper">
-                <button class="btn">＋ 上传图片 (多选)</button>
+                <button class="btn" onclick="document.getElementById('fileInput').click()">＋ 上传图片 (多选)</button>
                 <input type="file" id="fileInput" accept="image/*" multiple onchange="uploadFiles()">
             </div>
             <div id="status">准备就绪</div>
@@ -92,7 +93,7 @@
                 <button class="delete-btn" onclick="deleteImage('{{ img.name }}', {{ loop.index0 }})">×</button>
                 <div class="card-body">
                     <div class="file-name" title="{{ img.name }}">{{ img.name }}</div>
-                    <div class="meta-info"><span>{{ img.size_fmt }}</span><span>🔒</span></div>
+                    <div class="meta-info"><span>{{ img.size_fmt }}</span><span class="res-tag">...</span></div>
                     
                     <button class="copy-btn primary" onclick="copyLink(this, '{{ img.raw_url }}')">📋 复制直链</button>
                     <button class="copy-btn" onclick="copyMarkdown(this, '{{ img.name }}', '{{ img.raw_url }}')">📝 复制 Markdown</button>
@@ -111,15 +112,13 @@
                 <button class="lb-ctl-btn" onclick="resetZoom()" title="1:1" style="font-size:14px">1:1</button>
                 <button class="lb-ctl-btn" onclick="zoom(0.2)" title="放大">＋</button>
                 <span class="divider"></span>
-                <button class="lb-ctl-btn" onclick="copyCurrentLink(this)" title="复制链接">🔗</button>
+                <button class="lb-ctl-btn" onclick="copyCurrentLink(this)" title="复制直链">🔗</button>
             </div>
         </div>
         <div class="filmstrip-container"><div class="filmstrip" id="filmstrip" onclick="event.stopPropagation()"></div></div>
     </div>
 
     <script>
-        // 这里的变量会被 Flask 后端模板替换
-        // ⚠️ 必须确保你的 Python 后端传递了 config 变量
         const CFG = {
             token: "{{ config.token }}",
             repo: "{{ config.repo }}",
@@ -134,14 +133,12 @@
         ];
         let curIdx = 0, scale = 1;
 
-        // --- 核心：自动补全链接函数 ---
         function getFullUrl(path) {
             if (!path) return "";
             if (path.startsWith('http')) return path;
             return window.location.origin + path;
         }
 
-        // --- 核心：打勾动画 ---
         function showTick(btn) {
             if(!btn) return;
             const originalText = btn.innerText;
@@ -175,25 +172,26 @@
             showTick(btn);
         }
 
-        // --- 私有图加载逻辑 ---
         async function loadPrivateImage(imgObj) {
             const rawUrl = imgObj.getAttribute('data-src');
             if (!rawUrl) return;
             try {
-                // 如果是代理模式，直接 fetch 即可，不需要token
                 const res = await fetch(rawUrl); 
                 if (res.ok) {
                     const blob = await res.blob();
                     const objectUrl = URL.createObjectURL(blob);
+                    
+                    // 🔥 修复点2：图片加载完成后，设置 src 并触发 updateRes 更新分辨率
+                    imgObj.onload = () => updateRes(imgObj);
                     imgObj.src = objectUrl;
                     imgObj.style.opacity = '1';
+                    
                     const found = galleryData.find(i => i.url === rawUrl);
                     if(found) found.blobUrl = objectUrl;
                 }
             } catch (e) { console.error("加载失败", e); }
         }
 
-        // --- 🔥 核心修复：前端直传上传逻辑 (解决 4.5MB 限制) ---
         async function uploadFiles() {
             const inp = document.getElementById('fileInput');
             if (!inp.files.length) return;
@@ -204,15 +202,12 @@
             
             for (let file of inp.files) {
                 const ext = file.name.substring(file.name.lastIndexOf('.'));
-                
-                // 🔥 修复：改为 4 位随机字符 (2, 6)
                 const randomName = Math.random().toString(36).substring(2, 6) + (ext || '.jpg');
                 
                 try {
                     const base64Content = await toBase64(file);
                     const cleanContent = base64Content.split(',')[1]; 
                     
-                    // 这里使用的是 GitHub API，绕过 Vercel
                     const url = `${CFG.api}/${randomName}`;
                     const body = {
                         message: `Up ${randomName}`,
@@ -257,9 +252,7 @@
             });
         }
 
-        // --- 删除逻辑 ---
         async function deleteImage(name, idx) {
-            if(!confirm('确定删除?')) return;
             const fd = new FormData(); fd.append('filename', name);
             const res = await fetch('/delete', { method: 'POST', body: fd });
             if ((await res.json()).status === 'success') document.getElementById('card-'+idx).remove();
@@ -285,7 +278,6 @@
             curIdx = idx; scale = 1;
             const img = document.getElementById('lb-img');
             const item = galleryData[idx];
-            // 优先用 blob，没有就用 raw url
             const src = item.blobUrl || item.url;
             img.src = src;
             img.style.transform = `scale(1)`;
@@ -302,6 +294,8 @@
         }
         function zoom(d) { scale += d; if(scale<0.1) scale=0.1; document.getElementById('lb-img').style.transform = `scale(${scale})`; }
         function resetZoom() { scale = 1; document.getElementById('lb-img').style.transform = `scale(1)`; }
+        
+        // 分辨率更新辅助函数
         function updateRes(img) { if(img.naturalWidth) img.closest('.card').querySelector('.res-tag').innerText = img.naturalWidth+'x'+img.naturalHeight; }
         
         document.getElementById('lb-img').addEventListener('wheel', function(e) {
