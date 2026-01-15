@@ -23,7 +23,7 @@
         .upload-wrapper input { position: absolute; left: 0; top: 0; font-size: 100px; opacity: 0; cursor: pointer; }
         #status { margin-top: 15px; color: #666; font-size: 14px; word-break: break-all; }
         
-        /* 头部修复：两端对齐 */
+        /* 头部布局：两端对齐 */
         .gallery-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; width: 100%; }
         .refresh-btn { background: none; border: none; cursor: pointer; color: #64748b; font-size: 14px; display: flex; align-items: center; gap: 5px; padding: 8px 12px; border-radius: 6px; }
         .refresh-btn:hover { background: #f1f5f9; color: var(--primary); }
@@ -68,7 +68,7 @@
     <div class="container">
         <div class="top-nav"><a href="/logout" class="logout-btn">🔴 退出</a></div>
         <div class="upload-section">
-            <h2 style="margin-top:0;">☁️ CloudGallery</h2>
+            <h2 style="margin-top:0;">☁️ CloudGallery (VIP 直传)</h2>
             <div class="upload-wrapper">
                 <button class="btn">＋ 上传图片 (多选)</button>
                 <input type="file" id="fileInput" accept="image/*" multiple onchange="uploadFiles()">
@@ -76,7 +76,7 @@
             <div id="status">准备就绪</div>
         </div>
         <div class="gallery-header">
-            <h3 style="margin:0">🖼️ 图片列表</h3>
+            <h3 class="header-title">🖼️ 图片列表</h3>
             <button class="refresh-btn" onclick="location.reload()">🔄 刷新</button>
         </div>
         <div class="gallery-grid">
@@ -111,15 +111,15 @@
                 <button class="lb-ctl-btn" onclick="resetZoom()" title="1:1" style="font-size:14px">1:1</button>
                 <button class="lb-ctl-btn" onclick="zoom(0.2)" title="放大">＋</button>
                 <span class="divider"></span>
-                <button class="lb-ctl-btn" onclick="copyCurrentLink(this)" title="复制直链">🔗</button>
+                <button class="lb-ctl-btn" onclick="copyCurrentLink(this)" title="复制链接">🔗</button>
             </div>
         </div>
         <div class="filmstrip-container"><div class="filmstrip" id="filmstrip" onclick="event.stopPropagation()"></div></div>
     </div>
 
     <script>
-        // 注意：这里的变量会被 Flask 后端模板替换
-        // 确保你的 app.py 里 home() 函数传了 config 变量
+        // 这里的变量会被 Flask 后端模板替换
+        // ⚠️ 必须确保你的 Python 后端传递了 config 变量
         const CFG = {
             token: "{{ config.token }}",
             repo: "{{ config.repo }}",
@@ -134,14 +134,14 @@
         ];
         let curIdx = 0, scale = 1;
 
-        // --- 核心修复：自动补全链接函数 ---
+        // --- 核心：自动补全链接函数 ---
         function getFullUrl(path) {
             if (!path) return "";
             if (path.startsWith('http')) return path;
             return window.location.origin + path;
         }
 
-        // --- 核心修复：打勾动画 ---
+        // --- 核心：打勾动画 ---
         function showTick(btn) {
             if(!btn) return;
             const originalText = btn.innerText;
@@ -175,12 +175,12 @@
             showTick(btn);
         }
 
-        // --- 私有图加载 ---
+        // --- 私有图加载逻辑 ---
         async function loadPrivateImage(imgObj) {
             const rawUrl = imgObj.getAttribute('data-src');
             if (!rawUrl) return;
             try {
-                // 因为是代理模式(file/xxx)，直接fetch即可，不需要token
+                // 如果是代理模式，直接 fetch 即可，不需要token
                 const res = await fetch(rawUrl); 
                 if (res.ok) {
                     const blob = await res.blob();
@@ -193,8 +193,7 @@
             } catch (e) { console.error("加载失败", e); }
         }
 
-        // --- 核心修复：上传逻辑 (前端直传 GitHub) ---
-        // 只有用这个逻辑，才能绕过 Vercel 后端，解决 "Use frontend upload" 报错
+        // --- 🔥 核心修复：前端直传上传逻辑 (解决 4.5MB 限制) ---
         async function uploadFiles() {
             const inp = document.getElementById('fileInput');
             if (!inp.files.length) return;
@@ -213,7 +212,7 @@
                     const base64Content = await toBase64(file);
                     const cleanContent = base64Content.split(',')[1]; 
                     
-                    // 这里使用的是 GitHub API，不是 Flask 接口
+                    // 这里使用的是 GitHub API，绕过 Vercel
                     const url = `${CFG.api}/${randomName}`;
                     const body = {
                         message: `Up ${randomName}`,
