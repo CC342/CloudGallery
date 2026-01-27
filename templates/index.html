@@ -203,7 +203,9 @@
             
             for (let file of inp.files) {
                 const ext = file.name.substring(file.name.lastIndexOf('.'));
-                const randomName = Math.random().toString(36).substring(2, 6) + (ext || '.jpg');
+                const shortTime = new Date().getTime().toString(36);
+                const randomName = `${shortTime}_${Math.random().toString(36).substring(2, 6)}${ext || '.jpg'}`;
+                // const randomName = Math.random().toString(36).substring(2, 6) + (ext || '.jpg');
                 
                 try {
                     const base64Content = await toBase64(file);
